@@ -1,12 +1,31 @@
 const logger = require('./logger');
+const { TimeoutError } = require('./errors');
 
 /**
- * Retry utility with exponential backoff
+ * Create a promise that rejects after a timeout
+ */
+function withTimeout(promise, timeoutMs, context = 'operation') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new TimeoutError(`${context} timed out after ${timeoutMs}ms`, {
+          timeout: timeoutMs,
+          context
+        }));
+      }, timeoutMs);
+    })
+  ]);
+}
+
+/**
+ * Retry utility with exponential backoff and timeout support
  * @param {Function} fn - Async function to retry
  * @param {Object} options - Retry options
  * @param {number} options.maxRetries - Maximum number of retries (default: 3)
  * @param {number} options.initialDelay - Initial delay in ms (default: 100)
  * @param {number} options.maxDelay - Maximum delay in ms (default: 5000)
+ * @param {number} options.timeout - Timeout per attempt in ms (default: 30000)
  * @param {Function} options.shouldRetry - Function to determine if error is retryable
  * @param {string} options.context - Context string for logging
  * @returns {Promise} - Result of the function
@@ -16,9 +35,11 @@ async function retry(fn, options = {}) {
     maxRetries = 3,
     initialDelay = 100,
     maxDelay = 5000,
+    timeout = 30000, // 30 seconds default timeout
     shouldRetry = (error) => {
-      // Default: retry on network errors and 5xx status codes
-      return error.code === 'ECONNREFUSED' ||
+      // Default: retry on network errors, timeouts, and 5xx status codes
+      return error instanceof TimeoutError ||
+             error.code === 'ECONNREFUSED' ||
              error.code === 'ETIMEDOUT' ||
              error.code === 'ENOTFOUND' ||
              (error.response && error.response.status >= 500);
@@ -30,7 +51,8 @@ async function retry(fn, options = {}) {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      // Wrap function call with timeout
+      return await withTimeout(fn(), timeout, context);
     } catch (error) {
       lastError = error;
       
@@ -43,6 +65,7 @@ async function retry(fn, options = {}) {
             attempt,
             maxRetries,
             error: {
+              name: error.name,
               message: error.message,
               code: error.code
             }
@@ -58,7 +81,9 @@ async function retry(fn, options = {}) {
         attempt,
         maxRetries,
         delay,
+        timeout,
         error: {
+          name: error.name,
           message: error.message,
           code: error.code
         }

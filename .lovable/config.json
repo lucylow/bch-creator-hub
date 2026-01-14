@@ -1,0 +1,87 @@
+{
+  "name": "BCH Creator Hub",
+  "description": "A creator monetization platform built on Bitcoin Cash with payment links, NFTs, analytics, and DAO governance",
+  "framework": "react",
+  "language": "typescript",
+  "buildTool": "vite",
+  "uiLibrary": "shadcn/ui",
+  "styling": "tailwindcss",
+  "packageManager": "npm",
+  "entryPoint": "src/main.tsx",
+  "appComponent": "src/App.tsx",
+  "sourceDirectory": "src",
+  "publicDirectory": "public",
+  "componentsDirectory": "src/components",
+  "pagesDirectory": "src/pages",
+  "apiDirectory": "backend/src",
+  "backendPort": 3001,
+  "frontendPort": 3000,
+  "aliases": {
+    "@": "./src"
+  },
+  "features": [
+    "payment-links",
+    "nft-marketplace",
+    "analytics",
+    "wallet-integration",
+    "dao-governance",
+    "web3-integration",
+    "bitcoin-cash-integration"
+  ],
+  "keyTechnologies": [
+    "react",
+    "typescript",
+    "vite",
+    "react-router-dom",
+    "@tanstack/react-query",
+    "wagmi",
+    "@rainbow-me/rainbowkit",
+    "viem",
+    "ethers",
+    "express",
+    "postgresql",
+    "redis",
+    "socket.io"
+  ],
+  "importantPaths": {
+    "components": "src/components",
+    "pages": "src/pages",
+    "contexts": "src/contexts",
+    "hooks": "src/hooks",
+    "lib": "src/lib",
+    "services": "src/services",
+    "utils": "src/utils",
+    "types": "src/types",
+    "backend": "backend/src",
+    "backendRoutes": "backend/src/routes",
+    "backendControllers": "backend/src/controllers",
+    "backendServices": "backend/src/services",
+    "backendModels": "backend/src/models"
+  },
+  "routing": {
+    "library": "react-router-dom",
+    "config": "src/App.tsx"
+  },
+  "stateManagement": {
+    "queryClient": "@tanstack/react-query",
+    "contexts": [
+      "src/contexts/WalletContext.tsx",
+      "src/contexts/CreatorContext.tsx"
+    ]
+  },
+  "web3": {
+    "provider": "wagmi",
+    "walletConnector": "@rainbow-me/rainbowkit",
+    "chainLibrary": "viem",
+    "config": "src/lib/web3"
+  },
+  "backend": {
+    "framework": "express",
+    "entryPoint": "backend/src/server.js",
+    "port": 3001,
+    "database": "postgresql",
+    "cache": "redis",
+    "websocket": "socket.io"
+  }
+}
+

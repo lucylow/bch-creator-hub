@@ -16,33 +16,92 @@ class Creator {
     twitterHandle,
     feeBasisPoints = 100
   }) {
+    // Input validation
+    if (!walletAddress || typeof walletAddress !== 'string') {
+      throw new ValidationError('Wallet address is required', {
+        context: { walletAddress }
+      });
+    }
+
+    if (!pubKeyHex || typeof pubKeyHex !== 'string') {
+      throw new ValidationError('Public key is required', {
+        context: { pubKeyHex }
+      });
+    }
+
+    if (feeBasisPoints < 0 || feeBasisPoints > 10000) {
+      throw new ValidationError('Fee basis points must be between 0 and 10000', {
+        context: { feeBasisPoints }
+      });
+    }
+
+    // Check if wallet address already exists
+    try {
+      const existing = await this.findByWalletAddress(walletAddress);
+      if (existing) {
+        throw new ConflictError('Creator with this wallet address already exists', {
+          context: { walletAddress, existingCreatorId: existing.creator_id }
+        });
+      }
+    } catch (error) {
+      // Re-throw ConflictError, but allow other errors to pass through
+      if (error instanceof ConflictError) {
+        throw error;
+      }
+      // Log but continue if it's a different error (e.g., database connection issue)
+      logger.warn('Error checking for existing creator:', error);
+    }
+
     const creatorId = generateRandomId(16);
     const createdAt = new Date();
     
-    const result = await query(
-      `INSERT INTO creators (
-        creator_id, wallet_address, pub_key_hex, display_name,
-        email, avatar_url, bio, website, twitter_handle,
-        fee_basis_points, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING *`,
-      [
-        creatorId,
-        walletAddress,
-        pubKeyHex,
-        displayName,
-        email,
-        avatarUrl,
-        bio,
-        website,
-        twitterHandle,
-        feeBasisPoints,
-        createdAt,
-        createdAt
-      ]
-    );
-    
-    return result.rows[0];
+    try {
+      const result = await query(
+        `INSERT INTO creators (
+          creator_id, wallet_address, pub_key_hex, display_name,
+          email, avatar_url, bio, website, twitter_handle,
+          fee_basis_points, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING *`,
+        [
+          creatorId,
+          walletAddress,
+          pubKeyHex,
+          displayName,
+          email,
+          avatarUrl,
+          bio,
+          website,
+          twitterHandle,
+          feeBasisPoints,
+          createdAt,
+          createdAt
+        ]
+      );
+      
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error('Failed to create creator record');
+      }
+      
+      return result.rows[0];
+    } catch (error) {
+      // Re-throw custom errors
+      if (error instanceof ValidationError || error instanceof ConflictError) {
+        throw error;
+      }
+      
+      logger.error('Error creating creator:', {
+        error: {
+          name: error.name,
+          message: error.message,
+          code: error.code
+        },
+        walletAddress
+      });
+      
+      // Let database error handling middleware handle it
+      throw error;
+    }
   }
 
   static async findByWalletAddress(walletAddress) {
@@ -70,6 +129,27 @@ class Creator {
   }
 
   static async update(creatorId, updates) {
+    if (!creatorId || typeof creatorId !== 'string') {
+      throw new ValidationError('Creator ID is required', {
+        context: { creatorId }
+      });
+    }
+
+    if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
+      throw new ValidationError('Updates object is required and must not be empty', {
+        context: { updates }
+      });
+    }
+
+    // Validate fee_basis_points if provided
+    if (updates.fee_basis_points !== undefined) {
+      if (updates.fee_basis_points < 0 || updates.fee_basis_points > 10000) {
+        throw new ValidationError('Fee basis points must be between 0 and 10000', {
+          context: { fee_basis_points: updates.fee_basis_points }
+        });
+      }
+    }
+
     const fields = [];
     const values = [];
     let paramCount = 1;
@@ -90,14 +170,38 @@ class Creator {
     values.push(new Date());
     values.push(creatorId);
 
-    const result = await query(
-      `UPDATE creators SET ${fields.join(', ')} 
-       WHERE creator_id = $${paramCount} 
-       RETURNING *`,
-      values
-    );
+    try {
+      const result = await query(
+        `UPDATE creators SET ${fields.join(', ')} 
+         WHERE creator_id = $${paramCount} 
+         RETURNING *`,
+        values
+      );
 
-    return result.rows[0];
+      if (!result.rows || result.rows.length === 0) {
+        throw new NotFoundError('Creator', {
+          context: { creatorId }
+        });
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      // Re-throw custom errors
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      logger.error('Error updating creator:', {
+        error: {
+          name: error.name,
+          message: error.message,
+          code: error.code
+        },
+        creatorId
+      });
+      
+      throw error;
+    }
   }
 
   static async updateContractAddress(creatorId, contractAddress) {
