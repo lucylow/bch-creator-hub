@@ -1,4 +1,3 @@
-import { isDemoMode } from '@/config/demo';
 import { demoWallet } from '@/demo';
 import { logger } from '@/utils/logger';
 import { bchProvider } from '@/lib/web3/providers/BCHProvider';

@@ -27,8 +27,12 @@ const StatCard: React.FC<Props> = ({ title, value, subValue, icon, trend, color 
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="glass-card rounded-xl p-5 hover:border-primary/50 transition-all duration-300 cursor-default group"
+      whileHover={{ y: -4, scale: 1.02, transition: { duration: 0.2 } }}
+      whileTap={{ scale: 0.98 }}
+      className="glass-card rounded-xl p-5 hover:border-primary/50 transition-all duration-300 cursor-default group focus-within:ring-2 focus-within:ring-primary/50 focus-within:outline-none"
+      tabIndex={0}
+      role="article"
+      aria-label={`${title}: ${value}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className={clsx(

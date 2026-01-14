@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -100,10 +101,10 @@ const PaymentForm: React.FC<Props> = ({
               type="button"
               key={p}
               onClick={() => handleAmountChange(String(p))}
-              className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
                 localAmount === String(p)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:scale-105 active:scale-95'
               }`}
             >
               {p} BCH
@@ -152,7 +153,15 @@ const PaymentForm: React.FC<Props> = ({
         />
       </div>
 
-      {error && <div className="text-red-400 text-sm bg-red-500/10 p-2 rounded-lg">{error}</div>}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/20"
+        >
+          {error}
+        </motion.div>
+      )}
 
       <div className="flex items-center justify-between text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
         <div>Est. Network Fee</div>

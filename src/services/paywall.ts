@@ -2,10 +2,9 @@
  * Paywall Service
  * 
  * Handles content access checks and payment verification.
- * Supports both demo mode and real blockchain mode.
+ * Automatically falls back to mock data when web3/API operations fail.
  */
-import { isDemoMode } from '@/config/demo';
-import { mockIndexerApi, hasPaidForContent } from '@/demo';
+import { mockIndexerApi } from '@/demo';
 import { logger } from '@/utils/logger';
 
 export interface ContentAccessResult {

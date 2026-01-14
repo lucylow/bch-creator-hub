@@ -4,6 +4,7 @@ import { ArrowDownLeft, ArrowUpRight, ExternalLink } from 'lucide-react';
 import { formatBCH, formatDate, truncateAddress, formatTransactionType } from '@/utils/formatters';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import EmptyState from '@/components/Common/EmptyState';
 
 type Tx = {
   id?: string;
@@ -35,13 +36,12 @@ const TransactionList: React.FC<Props> = ({ transactions = [], loading = false, 
 
   if (!transactions.length) {
     return (
-      <div className="text-center py-16 text-muted-foreground">
-        <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
-          <ArrowDownLeft className="w-8 h-8 text-muted-foreground/50" />
-        </div>
-        <p className="text-lg font-medium text-foreground mb-2">No transactions yet</p>
-        <p className="text-sm">Share your payment links to start receiving BCH!</p>
-      </div>
+      <EmptyState
+        icon={ArrowDownLeft}
+        title="No transactions yet"
+        description="Share your payment links to start receiving BCH payments from your supporters."
+        size="sm"
+      />
     );
   }
 

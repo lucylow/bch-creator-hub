@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatBCH } from '@/utils/formatters';
 import { QRCodeModal } from '@/components/Common/QRCodeDisplay';
+import EmptyState from '@/components/Common/EmptyState';
+import Breadcrumbs from '@/components/Common/Breadcrumbs';
 
 interface PaymentLink {
   id: string;
@@ -64,6 +66,11 @@ const PaymentLinksPage = () => {
   return (
     <div className="min-h-screen pt-24 pb-12 px-6">
       <div className="max-w-6xl mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
+        </div>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -156,18 +163,20 @@ const PaymentLinksPage = () => {
         </div>
 
         {filteredLinks.length === 0 && (
-          <div className="text-center py-16">
-            <Link2 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No payment links yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first payment link to start receiving BCH
-            </p>
-            <Link to="/links/new">
-              <Button className="bg-gradient-primary hover:opacity-90 text-primary-foreground">
-                Create Your First Link
-              </Button>
-            </Link>
-          </div>
+          <EmptyState
+            icon={Link2}
+            title={search ? "No links found" : "No payment links yet"}
+            description={search 
+              ? `No payment links match "${search}". Try a different search term.`
+              : "Create your first payment link to start receiving BCH payments from your supporters."
+            }
+            action={{
+              label: search ? "Clear Search" : "Create Your First Link",
+              onClick: search ? () => setSearch('') : () => {},
+              variant: search ? 'outline' : 'default',
+            }}
+            size="md"
+          />
         )}
       </div>
 
@@ -183,6 +192,7 @@ const PaymentLinksPage = () => {
           level="M"
         />
       )}
+      </div>
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { ArrowLeft, Link2, DollarSign, Tag, FileText, Save } from 'lucide-react'
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Breadcrumbs from '@/components/Common/Breadcrumbs';
 
 const CreateLinkPage = () => {
   const navigate = useNavigate();
@@ -42,12 +43,18 @@ const CreateLinkPage = () => {
   return (
     <div className="min-h-screen pt-24 pb-12 px-6">
       <div className="max-w-2xl mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
+        </div>
+
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/links')}
+            className="hover:bg-muted"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>

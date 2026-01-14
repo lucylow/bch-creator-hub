@@ -107,9 +107,15 @@ class TransactionScanner {
       
       // Check for CashToken transfers
       const CashTokenService = require('../services/cashtoken.service');
-      if (BCHService.hasTokens(txData)) {
+      if (BCHService.hasTokens({ vout: vout, txid: txid })) {
         try {
-          await CashTokenService.processTokenTransfers(txData);
+          await CashTokenService.processTokenTransfers({
+            txid: txid,
+            vout: vout,
+            vin: txData.vin,
+            blockHeight: blockHeight,
+            blockTime: timestamp
+          });
         } catch (error) {
           logger.error(`Error processing CashToken transfers in ${txid}:`, error);
         }

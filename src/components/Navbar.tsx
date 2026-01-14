@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Route } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -66,14 +67,9 @@ const Navbar = () => {
       className="fixed top-0 w-full z-50 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl bg-background/80 border-b border-border/50 shadow-sm"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <motion.a 
-          href="#" 
+        <Link 
+          to="/"
           className="flex items-center gap-2 text-xl font-bold text-foreground hover:opacity-80 transition-opacity group"
-          whileHover={{ scale: 1.02 }}
-          onClick={(e) => {
-            e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
         >
           <motion.div
             whileHover={{ rotate: 360 }}
@@ -84,7 +80,7 @@ const Navbar = () => {
           <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             BCH Paywall Router
           </span>
-        </motion.a>
+        </Link>
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-1">
@@ -121,17 +117,32 @@ const Navbar = () => {
           })}
         </div>
 
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Button
-            onClick={() => scrollToSection('#waitlist')}
-            className="hidden md:flex bg-gradient-primary hover:opacity-90 transition-opacity text-primary-foreground font-semibold shadow-lg shadow-primary/20"
+        <div className="hidden md:flex items-center gap-3">
+          <Link to="/dashboard">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button
+                variant="outline"
+                className="border-border hover:border-primary hover:text-primary transition-opacity font-semibold"
+              >
+                Dashboard
+              </Button>
+            </motion.div>
+          </Link>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            Join Waitlist
-          </Button>
-        </motion.div>
+            <Button
+              onClick={() => scrollToSection('#waitlist')}
+              className="bg-gradient-primary hover:opacity-90 transition-opacity text-primary-foreground font-semibold shadow-lg shadow-primary/20"
+            >
+              Join Waitlist
+            </Button>
+          </motion.div>
+        </div>
 
         {/* Mobile Menu Button */}
         <button
@@ -201,7 +212,15 @@ const Navbar = () => {
                   })}
                 </div>
 
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4 border-t border-border space-y-3">
+                  <Link to="/dashboard">
+                    <Button
+                      variant="outline"
+                      className="w-full border-border hover:border-primary hover:text-primary font-semibold"
+                    >
+                      Dashboard
+                    </Button>
+                  </Link>
                   <Button
                     onClick={() => scrollToSection('#waitlist')}
                     className="w-full bg-gradient-primary text-primary-foreground font-semibold shadow-lg shadow-primary/20 hover:opacity-90"

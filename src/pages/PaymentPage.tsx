@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { formatBCH, truncateAddress, bchToSats } from '@/utils/formatters';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
+import PageTransition from '@/components/Common/PageTransition';
 import PaymentForm from '@/components/Payment/PaymentForm';
 import WalletConnectModal from '@/components/Wallet/WalletConnectModal';
 import { useWallet } from '@/contexts/WalletContext';
@@ -105,12 +106,14 @@ const PaymentPage = () => {
 
   if (paymentComplete) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6 py-24">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="glass-card rounded-2xl p-8 text-center max-w-md w-full"
-        >
+      <PageTransition>
+        <div className="min-h-screen flex items-center justify-center px-6 py-24">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            className="glass-card rounded-2xl p-8 text-center max-w-md w-full"
+          >
           <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-primary" />
           </div>
@@ -158,12 +161,14 @@ const PaymentPage = () => {
           </div>
         </motion.div>
       </div>
+      </PageTransition>
     );
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-6">
-      <div className="max-w-4xl mx-auto">
+    <PageTransition>
+      <div className="min-h-screen pt-24 pb-12 px-6">
+        <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -295,7 +300,8 @@ const PaymentPage = () => {
           onClose={() => setShowWalletModal(false)} 
         />
       )}
-    </div>
+      </div>
+    </PageTransition>
   );
 };
 

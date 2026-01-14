@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { 
-  DollarSign, TrendingUp, Users, Clock, RefreshCw, Plus, Wallet, Zap, Activity,
-  ArrowUpRight, ArrowDownRight, Link as LinkIcon, BarChart3, AlertCircle
+  DollarSign, TrendingUp, Users, Clock, RefreshCw, Plus, Wallet, Zap,
+  ArrowUpRight, BarChart3, AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,7 @@ import QuickActions from '@/components/Dashboard/QuickActions';
 import BalanceChart from '@/components/Dashboard/BalanceChart';
 import LiveFeed from '@/components/Dashboard/LiveFeed';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
-import DashboardSkeleton from '@/components/Common/DashboardSkeleton';
-import PageTransition from '@/components/Common/PageTransition';
+import Breadcrumbs from '@/components/Common/Breadcrumbs';
 import { useCreator } from '@/contexts/CreatorContext';
 import { apiService } from '@/services/api';
 import { formatBCH, formatNumber } from '@/utils/formatters';
@@ -142,7 +141,7 @@ const DashboardPage = () => {
   }, [stats]);
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    return <LoadingSpinner />;
   }
 
   if (error) {
@@ -172,6 +171,11 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pt-24 pb-12 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
+        </div>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

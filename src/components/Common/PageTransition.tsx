@@ -1,10 +1,9 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { ReactNode } from 'react';
 
 interface PageTransitionProps {
   children: ReactNode;
-  className?: string;
 }
 
 const pageVariants = {
@@ -12,36 +11,40 @@ const pageVariants = {
     opacity: 0,
     y: 10,
   },
-  in: {
+  enter: {
     opacity: 1,
     y: 0,
+    transition: {
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1],
+    },
   },
-  out: {
+  exit: {
     opacity: 0,
     y: -10,
+    transition: {
+      duration: 0.2,
+      ease: [0.22, 1, 0.36, 1],
+    },
   },
 };
 
-const pageTransition = {
-  type: 'tween',
-  ease: 'anticipate',
-  duration: 0.3,
-};
+const PageTransition = ({ children }: PageTransitionProps) => {
+  const location = useLocation();
 
-const PageTransition: React.FC<PageTransitionProps> = ({ children, className = '' }) => {
   return (
-    <motion.div
-      initial="initial"
-      animate="in"
-      exit="out"
-      variants={pageVariants}
-      transition={pageTransition}
-      className={className}
-    >
-      {children}
-    </motion.div>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        initial="initial"
+        animate="enter"
+        exit="exit"
+        variants={pageVariants}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
 };
 
 export default PageTransition;
-
