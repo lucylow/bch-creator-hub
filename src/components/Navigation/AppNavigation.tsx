@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Home, BarChart2, Link2, Settings, LogOut, Route, Wallet, Image, ChevronRight } from 'lucide-react';
+import { Menu, X, Home, BarChart2, Link2, Settings, LogOut, Route, Wallet, Image, ChevronRight, ArrowUpDown, ArrowUpRight, Users, HelpCircle } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 import { useCreator } from '@/contexts/CreatorContext';
 import WalletConnectButton from '@/components/Wallet/WalletConnectButton';
@@ -14,6 +14,9 @@ const navLinks = [
   { path: '/dashboard', label: 'Dashboard', icon: Home, exact: true },
   { path: '/links', label: 'Payment Links', icon: Link2, exact: false },
   { path: '/nfts', label: 'NFTs', icon: Image, exact: true },
+  { path: '/transactions', label: 'Transactions', icon: ArrowUpDown, exact: true },
+  { path: '/withdrawals', label: 'Withdrawals', icon: ArrowUpRight, exact: true },
+  { path: '/supporters', label: 'Supporters', icon: Users, exact: true },
   { path: '/analytics', label: 'Analytics', icon: BarChart2, exact: true },
   { path: '/settings', label: 'Settings', icon: Settings, exact: true },
 ];

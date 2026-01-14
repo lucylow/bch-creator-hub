@@ -66,7 +66,6 @@ class AnalyticsController {
   // Get earnings chart data
   async getEarningsChart(req, res, next) {
     try {
-      const _creatorId = req.creator.creator_id;
       const { period = '30d' } = req.query;
 
       // Simplified for hackathon - in production, query actual data grouped by interval

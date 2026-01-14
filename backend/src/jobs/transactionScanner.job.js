@@ -6,7 +6,7 @@ const Transaction = require('../models/Transaction');
 const NotificationService = require('../services/notification.service');
 const CashTokenService = require('../services/cashtoken.service');
 const logger = require('../utils/logger');
-const { ExternalServiceError, DatabaseError, AppError } = require('../utils/errors');
+const { ExternalServiceError, DatabaseError, AppError, ValidationError } = require('../utils/errors');
 
 class TransactionScanner {
   constructor() {
@@ -35,49 +35,149 @@ class TransactionScanner {
 
   async scanNewBlocks() {
     if (this.isScanning) {
+      logger.debug('Block scan already in progress, skipping...');
       return;
     }
 
     this.isScanning = true;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5;
 
     try {
       const currentHeight = await BCHService.getBlockHeight();
       
+      if (!currentHeight || currentHeight <= 0) {
+        throw new ExternalServiceError('BCH Service', 'Invalid block height returned', {
+          context: { currentHeight }
+        });
+      }
+      
       // Initialize last scanned block if not set
       if (this.lastScannedBlock === 0) {
-        const lastTx = await Transaction.getLastIndexedBlock();
-        this.lastScannedBlock = lastTx ? lastTx.block_height : currentHeight - 10;
+        try {
+          const lastTx = await Transaction.getLastIndexedBlock();
+          this.lastScannedBlock = lastTx ? lastTx.block_height : currentHeight - 10;
+        } catch (error) {
+          logger.warn('Error getting last indexed block, using fallback:', error);
+          this.lastScannedBlock = currentHeight - 10;
+        }
       }
 
       // Scan blocks from last scanned + 1 to current
       for (let height = this.lastScannedBlock + 1; height <= currentHeight; height++) {
-        await this.scanBlock(height);
-        this.lastScannedBlock = height;
+        try {
+          await this.scanBlock(height);
+          this.lastScannedBlock = height;
+          consecutiveErrors = 0; // Reset error counter on success
+        } catch (error) {
+          consecutiveErrors++;
+          logger.error(`Error scanning block ${height} (consecutive errors: ${consecutiveErrors}):`, {
+            error: {
+              name: error.name,
+              message: error.message,
+              code: error.code
+            },
+            blockHeight: height
+          });
+          
+          // If too many consecutive errors, stop scanning to prevent cascading failures
+          if (consecutiveErrors >= maxConsecutiveErrors) {
+            logger.error(`Too many consecutive errors (${consecutiveErrors}), stopping block scan`);
+            throw new AppError('Block scanning stopped due to consecutive errors', 500, {
+              context: { consecutiveErrors, lastScannedBlock: this.lastScannedBlock },
+              retryable: true
+            });
+          }
+          
+          // Continue to next block on error
+          continue;
+        }
       }
 
       // Also check mempool for unconfirmed transactions
-      await this.scanMempool();
+      try {
+        await this.scanMempool();
+      } catch (error) {
+        logger.error('Mempool scanning error (non-fatal):', {
+          error: {
+            name: error.name,
+            message: error.message
+          }
+        });
+        // Don't throw - mempool scanning is optional
+      }
 
     } catch (error) {
-      logger.error('Block scanning error:', error);
+      logger.error('Critical block scanning error:', {
+        error: {
+          name: error.name,
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        },
+        lastScannedBlock: this.lastScannedBlock
+      });
+      
+      // Re-throw critical errors
+      if (error instanceof AppError || error instanceof ExternalServiceError) {
+        throw error;
+      }
     } finally {
       this.isScanning = false;
     }
   }
 
   async scanBlock(blockHeight) {
+    if (!blockHeight || blockHeight <= 0) {
+      throw new ValidationError('Invalid block height', {
+        context: { blockHeight }
+      });
+    }
+
     try {
       logger.info(`Scanning block ${blockHeight}`);
       
       const transactions = await BCHService.scanBlock(blockHeight);
       
+      if (!Array.isArray(transactions)) {
+        logger.warn(`Invalid transactions array for block ${blockHeight}, skipping`);
+        return;
+      }
+      
+      let processedCount = 0;
+      let errorCount = 0;
+      
       for (const tx of transactions) {
-        await this.processTransaction(tx, true);
+        try {
+          await this.processTransaction(tx, true);
+          processedCount++;
+        } catch (error) {
+          errorCount++;
+          logger.error(`Error processing transaction in block ${blockHeight}:`, {
+            txid: tx?.txid,
+            error: {
+              name: error.name,
+              message: error.message
+            }
+          });
+          // Continue processing other transactions
+        }
       }
 
-      logger.info(`Scanned ${transactions.length} transactions from block ${blockHeight}`);
+      logger.info(`Scanned block ${blockHeight}: ${processedCount} processed, ${errorCount} errors`);
     } catch (error) {
-      logger.error(`Error scanning block ${blockHeight}:`, error);
+      logger.error(`Error scanning block ${blockHeight}:`, {
+        error: {
+          name: error.name,
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        },
+        blockHeight
+      });
+      
+      // Re-throw to allow caller to handle
+      throw error;
     }
   }
 
@@ -102,12 +202,15 @@ class TransactionScanner {
   }
 
   async processTransaction(txData, isConfirmed) {
+    if (!txData || !txData.txid) {
+      logger.warn('Invalid transaction data provided to processTransaction');
+      return;
+    }
+
+    const { txid, payloads, vout, timestamp, blockHeight } = txData;
+    
     try {
-      // Extract relevant information from transaction
-      const { txid, payloads, vout, timestamp, blockHeight } = txData;
-      
       // Check for CashToken transfers
-      const CashTokenService = require('../services/cashtoken.service');
       if (BCHService.hasTokens({ vout: vout, txid: txid })) {
         try {
           await CashTokenService.processTokenTransfers({
@@ -118,72 +221,193 @@ class TransactionScanner {
             blockTime: timestamp
           });
         } catch (error) {
-          logger.error(`Error processing CashToken transfers in ${txid}:`, error);
+          logger.error(`Error processing CashToken transfers in ${txid}:`, {
+            error: {
+              name: error.name,
+              message: error.message
+            },
+            txid
+          });
+          // Continue processing even if token processing fails
         }
+      }
+      
+      // Validate vout array
+      if (!Array.isArray(vout) || vout.length === 0) {
+        logger.debug(`Transaction ${txid} has no outputs, skipping`);
+        return;
       }
       
       // Find outputs to contract addresses
       for (const output of vout) {
-        if (output.scriptPubKey && output.scriptPubKey.addresses) {
+        try {
+          if (!output || !output.scriptPubKey || !output.scriptPubKey.addresses) {
+            continue;
+          }
+          
           const address = output.scriptPubKey.addresses[0];
           
+          if (!address) {
+            continue;
+          }
+          
           // Check if this is a creator's contract address
-          const creator = await Creator.findByContractAddress(address);
+          let creator;
+          try {
+            creator = await Creator.findByContractAddress(address);
+          } catch (error) {
+            logger.error(`Error looking up creator for address ${address}:`, {
+              error: {
+                name: error.name,
+                message: error.message
+              },
+              address,
+              txid
+            });
+            continue; // Skip this output if lookup fails
+          }
           
           if (creator && output.value > 0) {
             const amountSats = Math.round(output.value * 100000000);
             
+            if (amountSats <= 0) {
+              logger.warn(`Invalid amount for transaction ${txid}, output ${output.n}`);
+              continue;
+            }
+            
             // Find corresponding payload for this output
             const payload = this.findPayloadForOutput(payloads, output.n);
             
-            await this.saveTransaction({
-              txid,
-              creatorId: creator.creator_id,
-              amountSats,
-              senderAddress: this.getSenderAddress(txData.vin),
-              receiverAddress: address,
-              paymentType: payload ? payload.t || 1 : 1,
-              contentId: payload ? payload.i : null,
-              payloadJson: payload,
-              blockHeight,
-              isConfirmed,
-              confirmations: isConfirmed ? 1 : 0,
-              confirmedAt: isConfirmed ? new Date(timestamp * 1000) : null,
-              metadata: {
-                outputIndex: output.n,
-                script: output.scriptPubKey.hex
-              }
-            });
+            try {
+              await this.saveTransaction({
+                txid,
+                creatorId: creator.creator_id,
+                amountSats,
+                senderAddress: this.getSenderAddress(txData.vin),
+                receiverAddress: address,
+                paymentType: payload ? payload.t || 1 : 1,
+                contentId: payload ? payload.i : null,
+                payloadJson: payload,
+                blockHeight,
+                isConfirmed,
+                confirmations: isConfirmed ? 1 : 0,
+                confirmedAt: isConfirmed ? new Date(timestamp * 1000) : null,
+                metadata: {
+                  outputIndex: output.n,
+                  script: output.scriptPubKey.hex
+                }
+              });
+            } catch (error) {
+              logger.error(`Error saving transaction ${txid} for creator ${creator.creator_id}:`, {
+                error: {
+                  name: error.name,
+                  message: error.message,
+                  code: error.code
+                },
+                txid,
+                creatorId: creator.creator_id
+              });
+              // Continue processing other outputs
+            }
           }
+        } catch (error) {
+          logger.error(`Error processing output in transaction ${txid}:`, {
+            error: {
+              name: error.name,
+              message: error.message
+            },
+            txid,
+            outputIndex: output?.n
+          });
+          // Continue processing other outputs
         }
       }
     } catch (error) {
-      logger.error(`Error processing transaction ${txData.txid}:`, error);
+      logger.error(`Critical error processing transaction ${txid}:`, {
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        },
+        txid
+      });
+      // Don't re-throw - allow processing to continue with other transactions
     }
   }
 
   async saveTransaction(txData) {
+    if (!txData || !txData.txid || !txData.creatorId) {
+      throw new ValidationError('Invalid transaction data', {
+        context: { txData: txData ? Object.keys(txData) : null }
+      });
+    }
+
     try {
+      // Check if transaction already exists
+      const existing = await Transaction.findByTxid(txData.txid);
+      if (existing) {
+        logger.debug(`Transaction ${txData.txid} already exists, skipping`);
+        return existing;
+      }
+      
       // Save to database
       const transaction = await Transaction.create(txData);
       
-      // Update creator's balance cache
-      await this.updateCreatorBalance(txData.creatorId);
+      if (!transaction) {
+        throw new DatabaseError('Failed to create transaction record', {
+          context: { txid: txData.txid, creatorId: txData.creatorId }
+        });
+      }
       
-      // Send real-time notification
-      await NotificationService.notifyPaymentReceived(
+      // Update creator's balance cache (non-blocking)
+      this.updateCreatorBalance(txData.creatorId).catch(error => {
+        logger.error(`Error updating creator balance for ${txData.creatorId}:`, {
+          error: {
+            name: error.name,
+            message: error.message
+          }
+        });
+      });
+      
+      // Send real-time notification (non-blocking)
+      NotificationService.notifyPaymentReceived(
         txData.creatorId,
         transaction
-      );
+      ).catch(error => {
+        logger.error(`Error sending notification for transaction ${txData.txid}:`, {
+          error: {
+            name: error.name,
+            message: error.message
+          }
+        });
+      });
       
-      // Trigger webhooks
-      await this.triggerWebhooks(txData.creatorId, transaction);
+      // Trigger webhooks (non-blocking)
+      this.triggerWebhooks(txData.creatorId, transaction).catch(error => {
+        logger.error(`Error triggering webhooks for transaction ${txData.txid}:`, {
+          error: {
+            name: error.name,
+            message: error.message
+          }
+        });
+      });
       
       logger.info(`Saved transaction ${txData.txid} for creator ${txData.creatorId}`);
       
       return transaction;
     } catch (error) {
-      logger.error('Error saving transaction:', error);
+      logger.error('Error saving transaction:', {
+        error: {
+          name: error.name,
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        },
+        txid: txData.txid,
+        creatorId: txData.creatorId
+      });
+      
+      // Re-throw to allow caller to handle
       throw error;
     }
   }

@@ -1,6 +1,7 @@
 const PaymentIntent = require('../models/PaymentIntent');
 const PaymentService = require('../services/payment.service');
 const { validationResult } = require('express-validator');
+const logger = require('../utils/logger');
 const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
 const MicropaymentService = require('../services/micropayment.service');
 const QRCodeUtil = require('../utils/qrcode.util');

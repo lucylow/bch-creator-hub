@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 const logger = require('../utils/logger');
+const { ValidationError, AppError } = require('../utils/errors');
 
 class WebSocketServer {
   constructor() {
@@ -22,10 +23,30 @@ class WebSocketServer {
       // Handle creator authentication
       socket.on('authenticate', (data) => {
         try {
+          if (!data || typeof data !== 'object') {
+            socket.emit('error', { 
+              message: 'Invalid authentication data',
+              code: 'INVALID_DATA'
+            });
+            return;
+          }
+
           const { creatorId } = data;
           
-          if (!creatorId) {
-            socket.emit('error', { message: 'Creator ID required' });
+          if (!creatorId || typeof creatorId !== 'string' || creatorId.trim().length === 0) {
+            socket.emit('error', { 
+              message: 'Creator ID is required and must be a non-empty string',
+              code: 'MISSING_CREATOR_ID'
+            });
+            return;
+          }
+
+          // Validate creatorId format (should be 16 characters)
+          if (creatorId.length !== 16) {
+            socket.emit('error', { 
+              message: 'Invalid creator ID format',
+              code: 'INVALID_CREATOR_ID_FORMAT'
+            });
             return;
           }
 
@@ -42,8 +63,19 @@ class WebSocketServer {
           
           logger.info(`Socket ${socket.id} authenticated for creator ${creatorId}`);
         } catch (error) {
-          logger.error('WebSocket authentication error:', error);
-          socket.emit('error', { message: 'Authentication failed' });
+          logger.error('WebSocket authentication error:', {
+            error: {
+              name: error.name,
+              message: error.message,
+              stack: error.stack
+            },
+            socketId: socket.id
+          });
+          
+          socket.emit('error', { 
+            message: 'Authentication failed',
+            code: 'AUTHENTICATION_ERROR'
+          });
         }
       });
 
@@ -75,23 +107,73 @@ class WebSocketServer {
    * Broadcast message to all connections for a specific creator
    */
   broadcastToCreator(creatorId, event, data) {
+    if (!this.io) {
+      logger.warn('WebSocket server not initialized, cannot broadcast');
+      return;
+    }
+
+    if (!creatorId || typeof creatorId !== 'string') {
+      logger.warn('Invalid creatorId provided to broadcastToCreator:', { creatorId });
+      return;
+    }
+
+    if (!event || typeof event !== 'string') {
+      logger.warn('Invalid event name provided to broadcastToCreator:', { event });
+      return;
+    }
+
     try {
       const connections = this.creatorConnections.get(creatorId);
       
       if (!connections || connections.size === 0) {
+        logger.debug(`No connections found for creator ${creatorId}`);
         return;
       }
 
+      let successCount = 0;
+      let errorCount = 0;
+
       connections.forEach(socketId => {
-        const socket = this.io.sockets.sockets.get(socketId);
-        if (socket) {
-          socket.emit(event, data);
+        try {
+          const socket = this.io.sockets.sockets.get(socketId);
+          if (socket && socket.connected) {
+            socket.emit(event, data);
+            successCount++;
+          } else {
+            // Clean up stale connection
+            connections.delete(socketId);
+            errorCount++;
+          }
+        } catch (error) {
+          errorCount++;
+          logger.error(`Error emitting to socket ${socketId}:`, {
+            error: {
+              name: error.name,
+              message: error.message
+            },
+            socketId,
+            creatorId,
+            event
+          });
         }
       });
 
-      logger.debug(`Broadcasted ${event} to creator ${creatorId} (${connections.size} connections)`);
+      // Clean up empty connection sets
+      if (connections.size === 0) {
+        this.creatorConnections.delete(creatorId);
+      }
+
+      logger.debug(`Broadcasted ${event} to creator ${creatorId}: ${successCount} successful, ${errorCount} errors`);
     } catch (error) {
-      logger.error(`Error broadcasting to creator ${creatorId}:`, error);
+      logger.error(`Error broadcasting to creator ${creatorId}:`, {
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        },
+        creatorId,
+        event
+      });
     }
   }
 
