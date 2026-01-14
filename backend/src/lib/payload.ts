@@ -42,3 +42,4 @@ export function decodePayload(payload: Buffer): ParsedPayload | null {
   return { version, creatorId, paymentType, contentId, metadata };
 }
 
+

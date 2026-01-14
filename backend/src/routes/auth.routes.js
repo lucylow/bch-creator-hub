@@ -15,3 +15,4 @@ router.get('/verify', verifyToken, authController.verify);
 
 module.exports = router;
 
+

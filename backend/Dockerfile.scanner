@@ -19,3 +19,4 @@ USER nodejs
 CMD ["node", "src/jobs/transactionScanner.job.js"]
 
 
+
