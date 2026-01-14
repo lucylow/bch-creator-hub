@@ -102,6 +102,20 @@ module.exports = {
     TRANSACTION: 1800 // 30 minutes
   },
   
+  // Micro-payment settings
+  MICROPAYMENT: {
+    DUST_LIMIT: 546, // Minimum BCH output (dust limit)
+    MIN_AMOUNT: 546, // Minimum payment amount in satoshis
+    MAX_AMOUNT: 100000, // 0.001 BCH - typical micro-payment upper bound
+    BATCH_THRESHOLD: 10000, // 0.0001 BCH - below this, suggest batching
+    BATCH_SIZE: 10, // Number of payments to batch together
+    BATCH_TIMEOUT: 300000, // 5 minutes - max time to wait for batching
+    FEE_OPTIMIZATION_THRESHOLD: 5000, // 0.00005 BCH - optimize fees below this
+    MIN_FEE_PER_BYTE: 1.0, // Minimum fee per byte for micro-payments
+    RECOMMENDED_FEE_PER_BYTE: 1.0, // Recommended fee per byte
+    FAST_FEE_PER_BYTE: 1.5 // Fast confirmation fee per byte
+  },
+  
   BUSINESS_METRICS: {
     ARPU: 'arpu',
     CONVERSION_RATE: 'conversion_rate',

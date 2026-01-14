@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
+const { DatabaseError } = require('../utils/errors');
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -10,17 +11,87 @@ const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  // Enhanced connection options
+  statement_timeout: 30000, // 30 seconds
+  query_timeout: 30000,
+  application_name: 'bch-paywall-router'
 });
 
 // Test connection
-pool.on('connect', () => {
-  logger.info('Database connected successfully');
+pool.on('connect', (client) => {
+  logger.info('Database connected successfully', {
+    processId: client.processID,
+    database: client.database
+  });
 });
 
 pool.on('error', (err) => {
-  logger.error('Unexpected database error:', err);
-  process.exit(-1);
+  logger.error('Unexpected database pool error:', {
+    error: {
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    }
+  });
+  
+  // Only exit on critical errors, not on connection errors
+  const criticalErrors = ['42P01', '3D000', '08006'];
+  if (err.code && criticalErrors.includes(err.code)) {
+    logger.error('Critical database error, exiting process');
+    process.exit(-1);
+  }
 });
+
+// Enhanced query wrapper with error handling
+const queryWithErrorHandling = async (text, params) => {
+  const start = Date.now();
+  try {
+    const result = await pool.query(text, params);
+    const duration = Date.now() - start;
+    
+    // Log slow queries
+    if (duration > 1000) {
+      logger.warn('Slow query detected', {
+        duration: `${duration}ms`,
+        query: text.substring(0, 100) // First 100 chars
+      });
+    }
+    
+    return result;
+  } catch (err) {
+    const duration = Date.now() - start;
+    
+    // Convert PostgreSQL errors to DatabaseError
+    if (err.code && err.code.match(/^[0-9A-Z]{5}$/)) {
+      const dbError = DatabaseError.fromPostgresError(err, {
+        query: text.substring(0, 200), // First 200 chars for context
+        duration: `${duration}ms`
+      });
+      
+      logger.error('Database query error:', {
+        error: dbError.toJSON(),
+        query: text.substring(0, 100)
+      });
+      
+      throw dbError;
+    }
+    
+    // Log unexpected errors
+    logger.error('Unexpected database error:', {
+      error: {
+        name: err.name,
+        message: err.message,
+        code: err.code,
+        stack: err.stack
+      },
+      query: text.substring(0, 100),
+      duration: `${duration}ms`
+    });
+    
+    throw err;
+  }
+};
 
 // Create tables if they don't exist
 const initDatabase = async () => {
@@ -201,6 +272,41 @@ const initDatabase = async () => {
 
       CREATE INDEX IF NOT EXISTS idx_business_metrics_date ON business_metrics(metric_date);
       CREATE INDEX IF NOT EXISTS idx_business_metrics_type ON business_metrics(metric_type);
+
+      -- Contract UTXOs table (populated by indexer)
+      CREATE TABLE IF NOT EXISTS contract_utxos (
+        id BIGSERIAL PRIMARY KEY,
+        contract_address TEXT NOT NULL,
+        txid VARCHAR(100) NOT NULL,
+        vout INT NOT NULL,
+        satoshis BIGINT NOT NULL,
+        script_pubkey TEXT,
+        spent BOOLEAN DEFAULT FALSE,
+        first_seen_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(contract_address, txid, vout)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_contract_utxos_address ON contract_utxos(contract_address, spent);
+      CREATE INDEX IF NOT EXISTS idx_contract_utxos_txid ON contract_utxos(txid, vout);
+
+      -- Withdraw requests: store skeletons to validate later
+      CREATE TABLE IF NOT EXISTS withdraw_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        creator_id CHAR(16) NOT NULL REFERENCES creators(creator_id) ON DELETE CASCADE,
+        contract_address TEXT NOT NULL,
+        utxos JSONB NOT NULL,
+        raw_unsigned_hex TEXT NOT NULL,
+        totals JSONB NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_withdraw_requests_creator ON withdraw_requests(creator_id, status);
+      CREATE INDEX IF NOT EXISTS idx_withdraw_requests_status ON withdraw_requests(status, expires_at);
+
+      -- Add payout_address column to creators if it doesn't exist
+      ALTER TABLE creators ADD COLUMN IF NOT EXISTS payout_address VARCHAR(64);
     `);
 
     logger.info('Database tables created/verified');
@@ -213,8 +319,36 @@ const initDatabase = async () => {
 };
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
+  query: queryWithErrorHandling,
   getClient: () => pool.connect(),
   initDatabase,
-  pool
+  pool,
+  // Helper to get client with error handling
+  getClientWithErrorHandling: async () => {
+    try {
+      const client = await pool.connect();
+      
+      // Wrap client.query with error handling
+      const originalQuery = client.query.bind(client);
+      client.query = async (text, params) => {
+        try {
+          return await originalQuery(text, params);
+        } catch (err) {
+          if (err.code && err.code.match(/^[0-9A-Z]{5}$/)) {
+            throw DatabaseError.fromPostgresError(err, {
+              query: text?.substring(0, 200)
+            });
+          }
+          throw err;
+        }
+      };
+      
+      return client;
+    } catch (err) {
+      if (err.code && err.code.match(/^[0-9A-Z]{5}$/)) {
+        throw DatabaseError.fromPostgresError(err);
+      }
+      throw err;
+    }
+  }
 };

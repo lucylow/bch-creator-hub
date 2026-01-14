@@ -122,6 +122,50 @@ const validateTxid = [
   handleValidationErrors
 ];
 
+// Payload link generation validation
+const validatePayloadLink = [
+  param('creatorId').isLength({ min: 16, max: 16 }).withMessage('Creator ID must be 16 characters'),
+  body('paymentType').optional().isInt({ min: 1, max: 4 }).withMessage('Payment type must be between 1 and 4'),
+  body('amountSats').optional().custom((value) => {
+    if (value && !validateAmount(value)) {
+      throw new Error('Invalid amount');
+    }
+    return true;
+  }),
+  body('contentId').optional().isInt({ min: 0 }).withMessage('Content ID must be a non-negative integer'),
+  body('metadata').optional().custom((value) => {
+    if (typeof value === 'object' || typeof value === 'string') {
+      return true;
+    }
+    throw new Error('Metadata must be an object or string');
+  }),
+  handleValidationErrors
+];
+
+// Transaction broadcast validation
+const validateTransactionBroadcast = [
+  body('signedTxHex').notEmpty().withMessage('Signed transaction hex is required').custom((value) => {
+    // Validate hex string format
+    if (typeof value !== 'string') {
+      throw new Error('Transaction hex must be a string');
+    }
+    // Check if it's a valid hex string
+    if (!/^[0-9a-fA-F]+$/.test(value)) {
+      throw new Error('Transaction hex must be a valid hexadecimal string');
+    }
+    // Minimum reasonable transaction size (at least 100 bytes = 200 hex chars)
+    if (value.length < 200) {
+      throw new Error('Transaction hex appears to be too short');
+    }
+    // Maximum reasonable transaction size (1MB = 2M hex chars, but we'll use 500KB)
+    if (value.length > 1000000) {
+      throw new Error('Transaction hex appears to be too large');
+    }
+    return true;
+  }),
+  handleValidationErrors
+];
+
 module.exports = {
   handleValidationErrors,
   validateCreatorUpdate,
@@ -131,5 +175,7 @@ module.exports = {
   validateWebhook,
   validateCreatorId,
   validateIntentId,
-  validateTxid
+  validateTxid,
+  validatePayloadLink,
+  validateTransactionBroadcast
 };

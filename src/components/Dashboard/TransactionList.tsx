@@ -1,7 +1,9 @@
 import React from 'react';
-import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowDownLeft, ArrowUpRight, ExternalLink } from 'lucide-react';
 import { formatBCH, formatDate, truncateAddress, formatTransactionType } from '@/utils/formatters';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 type Tx = {
   id?: string;
@@ -15,62 +17,119 @@ type Tx = {
   createdAt?: string | number;
   paymentType?: string;
   senderAddress?: string;
+  status?: string;
 };
 
-type Props = { transactions?: Tx[]; loading?: boolean };
+type Props = { transactions?: Tx[]; loading?: boolean; limit?: number };
 
-const TransactionList: React.FC<Props> = ({ transactions = [], loading = false }) => {
+const TransactionList: React.FC<Props> = ({ transactions = [], loading = false, limit }) => {
   if (loading) {
     return (
       <div className="space-y-3">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-20 w-full rounded-xl" />
+        ))}
       </div>
     );
   }
 
   if (!transactions.length) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>No transactions yet.</p>
-        <p className="text-sm mt-2">Share your payment links to start receiving BCH!</p>
+      <div className="text-center py-16 text-muted-foreground">
+        <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
+          <ArrowDownLeft className="w-8 h-8 text-muted-foreground/50" />
+        </div>
+        <p className="text-lg font-medium text-foreground mb-2">No transactions yet</p>
+        <p className="text-sm">Share your payment links to start receiving BCH!</p>
       </div>
     );
   }
 
+  const displayTransactions = limit ? transactions.slice(0, limit) : transactions;
+
   return (
-    <ul className="space-y-3">
-      {transactions.map((tx) => {
+    <ul className="space-y-2">
+      {displayTransactions.map((tx, index) => {
         const timestamp = tx.timestamp || tx.createdAt || 0;
         const address = tx.to || tx.from || tx.senderAddress || '';
         const type = tx.type || (tx.paymentType ? 0 : 5);
+        const isIncoming = type === 5;
         
         return (
-          <li 
-            key={tx.txid || tx.id} 
-            className="flex items-center justify-between p-3 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors"
+          <motion.li
+            key={tx.txid || tx.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.05 }}
+            className="group"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-muted/50 flex items-center justify-center text-muted-foreground">
-                {type === 5 ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+            <div className="flex items-center justify-between p-4 bg-muted/20 rounded-xl hover:bg-muted/40 border border-border/50 hover:border-primary/30 transition-all duration-200">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className={`
+                  w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
+                  ${isIncoming 
+                    ? 'bg-green-500/10 text-green-400' 
+                    : 'bg-blue-500/10 text-blue-400'
+                  }
+                  group-hover:scale-110 transition-transform duration-200
+                `}>
+                  {isIncoming ? (
+                    <ArrowDownLeft className="w-5 h-5" />
+                  ) : (
+                    <ArrowUpRight className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {formatTransactionType(tx.paymentType || type)}
+                    </div>
+                    {tx.status && (
+                      <span className={`
+                        text-xs px-2 py-0.5 rounded-full
+                        ${tx.status === 'confirmed' 
+                          ? 'bg-green-500/10 text-green-400' 
+                          : 'bg-yellow-500/10 text-yellow-400'
+                        }
+                      `}>
+                        {tx.status}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground truncate">
+                    {tx.description || truncateAddress(address, 12)}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {formatDate(timestamp)}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="font-medium text-foreground">
-                  {formatTransactionType(tx.paymentType || type)}
+              <div className="flex items-center gap-3 ml-4">
+                <div className="text-right">
+                  <div className={`font-bold text-lg ${isIncoming ? 'text-green-400' : 'text-blue-400'}`}>
+                    {isIncoming ? '+' : ''}{formatBCH(tx.amountSats)}
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {tx.description || truncateAddress(address, 8)}
-                </div>
+                {tx.txid && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    asChild
+                  >
+                    <a
+                      href={`https://blockchair.com/bitcoin-cash/transaction/${tx.txid}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+                )}
               </div>
             </div>
-            <div className="text-right">
-              <div className="font-medium text-foreground">{formatBCH(tx.amountSats)}</div>
-              <div className="text-sm text-muted-foreground">
-                {formatDate(timestamp)}
-              </div>
-            </div>
-          </li>
+          </motion.li>
         );
       })}
     </ul>

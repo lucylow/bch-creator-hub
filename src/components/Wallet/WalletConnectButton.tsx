@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Wallet, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/contexts/WalletContext';
 import { truncateAddress } from '@/utils/formatters';
+import WalletConnectModal from './WalletConnectModal';
 
 type Props = { fullWidth?: boolean; size?: 'default' | 'sm' | 'lg' };
 
 const WalletConnectButton: React.FC<Props> = ({ fullWidth = false, size = 'default' }) => {
-  const { isConnected, address, connect, disconnect, isLoading } = useWallet();
+  const { isConnected, address, disconnect, isLoading } = useWallet();
+  const [showModal, setShowModal] = useState(false);
 
   if (isConnected && address) {
     return (
@@ -27,19 +29,26 @@ const WalletConnectButton: React.FC<Props> = ({ fullWidth = false, size = 'defau
   }
 
   return (
-    <Button
-      onClick={() => connect()}
-      disabled={isLoading}
-      className={`bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold ${fullWidth ? 'w-full' : ''}`}
-      size={size}
-    >
-      {isLoading ? (
-        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-      ) : (
-        <Wallet className="w-4 h-4 mr-2" />
-      )}
-      Connect Wallet
-    </Button>
+    <>
+      <Button
+        onClick={() => setShowModal(true)}
+        disabled={isLoading}
+        className={`bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold ${fullWidth ? 'w-full' : ''}`}
+        size={size}
+      >
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Wallet className="w-4 h-4 mr-2" />
+        )}
+        Connect Wallet
+      </Button>
+      
+      <WalletConnectModal 
+        open={showModal} 
+        onClose={() => setShowModal(false)} 
+      />
+    </>
   );
 };
 

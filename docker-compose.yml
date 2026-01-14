@@ -1,0 +1,164 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: bch_router
+      POSTGRES_PASSWORD: bch_router_password
+      POSTGRES_DB: bch_paywall_router
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bch_router"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bch_paywall_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bch_paywall_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: bch_paywall_router
+      DB_USER: bch_router
+      DB_PASSWORD: bch_router_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BCH_NETWORK: ${BCH_NETWORK:-testnet}
+      BCH_REST_URL: ${BCH_REST_URL:-https://api.fullstack.cash/v5/}
+      JWT_SECRET: ${JWT_SECRET:-your-jwt-secret-key-here-change-in-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bch_paywall_network
+    restart: unless-stopped
+
+  # Frontend (Vite React - development mode)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3001}
+      VITE_BCH_NETWORK: ${BCH_NETWORK:-testnet}
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - bch_paywall_network
+    command: npm run dev
+    profiles:
+      - frontend-dev
+
+  # Transaction Scanner/Indexer
+  scanner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.scanner
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: bch_paywall_router
+      DB_USER: bch_router
+      DB_PASSWORD: bch_router_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BCH_NETWORK: ${BCH_NETWORK:-testnet}
+      BCH_REST_URL: ${BCH_REST_URL:-https://api.fullstack.cash/v5/}
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    networks:
+      - bch_paywall_network
+    restart: unless-stopped
+    profiles:
+      - scanner
+
+  # Monitoring (Prometheus + Grafana) - Optional
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - bch_paywall_network
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3002:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3002}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - bch_paywall_network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  bch_paywall_network:
+    name: bch_paywall_network
+

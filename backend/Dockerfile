@@ -2,9 +2,19 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies for native modules
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    postgresql-client \
+    curl
+
+# Copy package files
 COPY package*.json ./
-RUN npm ci --only=production
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code
 COPY . .

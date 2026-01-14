@@ -4,6 +4,8 @@ const { validationResult } = require('express-validator');
 const { generateRandomId } = require('../utils/generators');
 const logger = require('../utils/logger');
 const { ValidationError, NotFoundError, ConflictError, AppError } = require('../utils/errors');
+const MicropaymentService = require('../services/micropayment.service');
+const { MICROPAYMENT } = require('../config/constants');
 
 class PaymentController {
   // Create payment intent
@@ -28,6 +30,26 @@ class PaymentController {
         recurrenceInterval,
         expiresInHours
       } = req.body;
+
+      // Validate micro-payment amount (dust limit check)
+      if (amountSats) {
+        const validation = MicropaymentService.validateAmount(amountSats);
+        if (!validation.valid) {
+          throw new ValidationError(validation.error, [{ msg: validation.error, param: 'amountSats' }]);
+        }
+
+        // Add micro-payment metadata
+        if (MicropaymentService.isMicropayment(amountSats)) {
+          metadata.isMicropayment = true;
+          metadata.shouldBatch = MicropaymentService.shouldBatch(amountSats);
+          
+          // Calculate fee efficiency
+          const BCHService = require('../services/bch.service');
+          const feeEstimate = BCHService.estimateFee();
+          const efficiency = MicropaymentService.analyzePaymentEfficiency(amountSats, feeEstimate.sats);
+          metadata.feeEfficiency = efficiency;
+        }
+      }
 
       // Calculate expiration
       let expiresAt = null;
@@ -179,11 +201,21 @@ class PaymentController {
         throw new AppError('Not authorized to record payment for this intent', 403);
       }
 
+      // Validate micro-payment amount
+      const validation = MicropaymentService.validateAmount(amountSats);
+      if (!validation.valid) {
+        throw new ValidationError(validation.error, [{ msg: validation.error, param: 'amountSats' }]);
+      }
+
       // Check if transaction already exists
       const existingTx = await Transaction.findByTxid(txid);
       if (existingTx) {
         throw new ConflictError('Transaction already recorded');
       }
+
+      // Calculate fee for transaction
+      const BCHService = require('../services/bch.service');
+      const feeEstimate = BCHService.estimateFee();
 
       // Create transaction record
       const transaction = await Transaction.create({
@@ -192,6 +224,7 @@ class PaymentController {
         paymentIntentId: paymentIntent.id,
         intentId: paymentIntent.intent_id,
         amountSats,
+        feeSats: feeEstimate.sats,
         senderAddress,
         receiverAddress: req.creator.contract_address,
         paymentType: paymentIntent.intent_type,
@@ -200,6 +233,8 @@ class PaymentController {
         isConfirmed: false,
         metadata: {
           recordedVia: 'frontend',
+          isMicropayment: MicropaymentService.isMicropayment(amountSats),
+          feeEfficiency: MicropaymentService.analyzePaymentEfficiency(amountSats, feeEstimate.sats),
           ...metadata
         }
       });
@@ -223,6 +258,26 @@ class PaymentController {
       const creatorId = req.creator.creator_id;
       const { amountSats, description, metadata = {} } = req.body;
 
+      // Validate micro-payment amount (dust limit check)
+      if (amountSats) {
+        const validation = MicropaymentService.validateAmount(amountSats);
+        if (!validation.valid) {
+          throw new ValidationError(validation.error, [{ msg: validation.error, param: 'amountSats' }]);
+        }
+
+        // Add micro-payment metadata
+        if (MicropaymentService.isMicropayment(amountSats)) {
+          metadata.isMicropayment = true;
+          metadata.shouldBatch = MicropaymentService.shouldBatch(amountSats);
+          
+          // Calculate fee efficiency
+          const BCHService = require('../services/bch.service');
+          const feeEstimate = BCHService.estimateFee();
+          const efficiency = MicropaymentService.analyzePaymentEfficiency(amountSats, feeEstimate.sats);
+          metadata.feeEfficiency = efficiency;
+        }
+      }
+
       // Create a one-time payment intent
       const paymentIntent = await PaymentIntent.create({
         creatorId,
@@ -241,7 +296,12 @@ class PaymentController {
         data: {
           paymentUrl,
           intentId: paymentIntent.intent_id,
-          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentUrl)}`
+          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentUrl)}`,
+          micropaymentInfo: amountSats && MicropaymentService.isMicropayment(amountSats) ? {
+            isMicropayment: true,
+            shouldBatch: MicropaymentService.shouldBatch(amountSats),
+            efficiency: metadata.feeEfficiency
+          } : null
         }
       });
     } catch (error) {

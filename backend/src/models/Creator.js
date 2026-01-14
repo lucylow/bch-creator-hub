@@ -164,6 +164,24 @@ class Creator {
     
     return result.rows;
   }
+
+  static async getSubscriptionTier(creatorId) {
+    const creator = await this.findByCreatorId(creatorId);
+    return creator ? (creator.subscription_tier || 'free') : 'free';
+  }
+
+  static async updateSubscriptionTier(creatorId, tier, expiresAt = null) {
+    const updates = { subscription_tier: tier };
+    if (expiresAt) {
+      updates.subscription_expires_at = expiresAt;
+    }
+    return this.update(creatorId, updates);
+  }
+
+  static async getFeeOptIn(creatorId) {
+    const creator = await this.findByCreatorId(creatorId);
+    return creator ? (creator.fee_opt_in !== false) : true; // Default to true
+  }
 }
 
 module.exports = Creator;

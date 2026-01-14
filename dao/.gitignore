@@ -1,0 +1,16 @@
+node_modules/
+.env
+*.log
+cache/
+artifacts/
+coverage/
+typechain-types/
+
+# Frontend
+frontend/build/
+frontend/node_modules/
+
+# Indexer
+indexer/proposals.db.json
+indexer/node_modules/
+

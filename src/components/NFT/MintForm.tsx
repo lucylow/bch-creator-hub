@@ -10,7 +10,7 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NFT_ADDRESS } from '@/lib/web3/providers/EVMProvider';
 
-// NFT Collection ABI (simplified - you'll need the full ABI from artifacts)
+// NFT Collection ABI (minimal - full ABI available after compilation)
 const NFT_ABI = [
   {
     type: 'function',

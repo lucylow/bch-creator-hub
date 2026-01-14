@@ -23,6 +23,15 @@ const mockLinks: PaymentLink[] = [
   { id: '1', title: 'Twitter Tips', description: 'Support my content on Twitter', amountSats: 0, type: 'tip', url: 'https://pay.bch/creator1/tip', clicks: 245, conversions: 42, createdAt: '2024-01-15' },
   { id: '2', title: 'Premium Article', description: 'Unlock exclusive content', amountSats: 50000, type: 'unlock', url: 'https://pay.bch/creator1/article-1', clicks: 89, conversions: 23, createdAt: '2024-01-10' },
   { id: '3', title: 'Monthly Membership', description: 'Get monthly access to all content', amountSats: 500000, type: 'subscription', url: 'https://pay.bch/creator1/membership', clicks: 156, conversions: 18, createdAt: '2024-01-05' },
+  { id: '4', title: 'YouTube Superchat', description: 'Support during livestreams', amountSats: 0, type: 'tip', url: 'https://pay.bch/creator1/superchat', clicks: 312, conversions: 67, createdAt: '2024-01-12' },
+  { id: '5', title: 'Premium Video Tutorial', description: 'Learn advanced BCH development', amountSats: 100000, type: 'unlock', url: 'https://pay.bch/creator1/tutorial-1', clicks: 134, conversions: 31, createdAt: '2024-01-08' },
+  { id: '6', title: 'Annual Pass', description: 'Year-long access to all premium content', amountSats: 5000000, type: 'subscription', url: 'https://pay.bch/creator1/annual', clicks: 78, conversions: 12, createdAt: '2024-01-03' },
+  { id: '7', title: 'Direct Donation', description: 'Support my work directly', amountSats: 0, type: 'tip', url: 'https://pay.bch/creator1/donate', clicks: 198, conversions: 54, createdAt: '2024-01-18' },
+  { id: '8', title: 'Exclusive Newsletter', description: 'Weekly deep-dive on BCH ecosystem', amountSats: 25000, type: 'subscription', url: 'https://pay.bch/creator1/newsletter', clicks: 167, conversions: 28, createdAt: '2024-01-06' },
+  { id: '9', title: 'Research Paper Access', description: 'Unlock detailed analysis documents', amountSats: 75000, type: 'unlock', url: 'https://pay.bch/creator1/research-1', clicks: 92, conversions: 19, createdAt: '2024-01-09' },
+  { id: '10', title: 'Code Repository Access', description: 'Get access to private code repos', amountSats: 200000, type: 'subscription', url: 'https://pay.bch/creator1/code-access', clicks: 145, conversions: 26, createdAt: '2024-01-11' },
+  { id: '11', title: 'One-on-One Consultation', description: 'Book a 30-minute session with me', amountSats: 500000, type: 'unlock', url: 'https://pay.bch/creator1/consultation', clicks: 43, conversions: 8, createdAt: '2024-01-14' },
+  { id: '12', title: 'Podcast Premium Feed', description: 'Ad-free episodes with bonus content', amountSats: 150000, type: 'subscription', url: 'https://pay.bch/creator1/podcast', clicks: 221, conversions: 35, createdAt: '2024-01-07' },
 ];
 
 const typeColors = {

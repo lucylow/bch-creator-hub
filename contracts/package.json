@@ -5,15 +5,21 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "test:foundry": "forge test",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia"
+    "deploy:create2": "hardhat run scripts/deploy-create2.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "voucher": "hardhat voucher"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@openzeppelin/contracts": "^5.0.0",
     "hardhat": "^2.19.0",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "forge-std": "^1.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
   }
 }
 

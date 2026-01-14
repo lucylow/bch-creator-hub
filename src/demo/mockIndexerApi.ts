@@ -8,7 +8,7 @@ import {
   MOCK_PAYMENTS,
   getPaymentsForCreator,
   getPaymentsFromUser,
-  hasPaidForContent,
+  hasPaidForContent as checkPaymentAccess,
 } from './mockPayments';
 import {
   MOCK_NFTS,
@@ -99,7 +99,7 @@ export const mockIndexerApi = {
    * Check if user has paid for content
    */
   async hasPaidForContent(address: string, contentId: string): Promise<boolean> {
-    return hasPaidForContent(address, contentId);
+    return checkPaymentAccess(address, contentId);
   },
 
   /**

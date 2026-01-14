@@ -51,11 +51,11 @@ class Subscription {
     const result = await query(
       `SELECT * FROM subscriptions 
        WHERE creator_id = $1 
-         AND status IN ($2, $3)
+         AND status IN ('${SUBSCRIPTION_STATUS.ACTIVE}', '${SUBSCRIPTION_STATUS.TRIAL}')
          AND billing_period_end > NOW()
        ORDER BY created_at DESC 
        LIMIT 1`,
-      [creatorId, SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIAL]
+      [creatorId]
     );
     return result.rows[0];
   }
@@ -132,10 +132,9 @@ class Subscription {
   static async findExpiring(withinDays = 7) {
     const result = await query(
       `SELECT * FROM subscriptions 
-       WHERE status IN ($1, $2)
+       WHERE status IN ('${SUBSCRIPTION_STATUS.ACTIVE}', '${SUBSCRIPTION_STATUS.TRIAL}')
          AND billing_period_end BETWEEN NOW() AND NOW() + INTERVAL '${withinDays} days'
-       ORDER BY billing_period_end ASC`,
-      [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIAL]
+       ORDER BY billing_period_end ASC`
     );
     return result.rows;
   }
@@ -144,12 +143,12 @@ class Subscription {
     const result = await query(
       `SELECT 
         COUNT(*) as total_subscriptions,
-        COUNT(CASE WHEN status = $1 THEN 1 END) as active_count,
-        COUNT(CASE WHEN status = $2 THEN 1 END) as canceled_count,
+        COUNT(CASE WHEN status = '${SUBSCRIPTION_STATUS.ACTIVE}' THEN 1 END) as active_count,
+        COUNT(CASE WHEN status = '${SUBSCRIPTION_STATUS.CANCELED}' THEN 1 END) as canceled_count,
         COALESCE(SUM(payment_amount_sats), 0) as total_revenue_sats
        FROM subscriptions 
-       WHERE creator_id = $3`,
-      [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.CANCELED, creatorId]
+       WHERE creator_id = $1`,
+      [creatorId]
     );
     return result.rows[0];
   }

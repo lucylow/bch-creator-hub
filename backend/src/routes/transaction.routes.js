@@ -16,4 +16,13 @@ router.get('/:txid', validateTxid, transactionController.getTransaction);
 // Get transaction stats
 router.get('/stats/summary', transactionController.getStats);
 
+// Get micro-payment stats
+router.get('/stats/micropayments', transactionController.getMicropaymentStats);
+
+// Get batchable payments
+router.get('/batchable', transactionController.getBatchablePayments);
+
+// Analyze payment efficiency
+router.post('/analyze-efficiency', transactionController.analyzePaymentEfficiency);
+
 module.exports = router;

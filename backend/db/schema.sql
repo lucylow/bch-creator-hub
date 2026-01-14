@@ -42,3 +42,38 @@ CREATE INDEX IF NOT EXISTS idx_payments_creator ON payments(creator_id, confirme
 CREATE INDEX IF NOT EXISTS idx_payments_block ON payments(block_height);
 CREATE INDEX IF NOT EXISTS idx_payments_txid ON payments(txid);
 
+-- Contract UTXOs table (populated by indexer)
+CREATE TABLE IF NOT EXISTS contract_utxos (
+  id BIGSERIAL PRIMARY KEY,
+  contract_address TEXT NOT NULL,
+  txid VARCHAR(100) NOT NULL,
+  vout INT NOT NULL,
+  satoshis BIGINT NOT NULL,
+  script_pubkey TEXT,
+  spent BOOLEAN DEFAULT FALSE,
+  first_seen_at timestamptz DEFAULT now(),
+  UNIQUE(contract_address, txid, vout)
+);
+
+CREATE INDEX IF NOT EXISTS idx_contract_utxos_address ON contract_utxos(contract_address, spent);
+CREATE INDEX IF NOT EXISTS idx_contract_utxos_txid ON contract_utxos(txid, vout);
+
+-- Withdraw requests: store skeletons to validate later
+CREATE TABLE IF NOT EXISTS withdraw_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  creator_id CHAR(16) NOT NULL REFERENCES creators(creator_id) ON DELETE CASCADE,
+  contract_address TEXT NOT NULL,
+  utxos JSONB NOT NULL,
+  raw_unsigned_hex TEXT NOT NULL,
+  totals JSONB NOT NULL,
+  status TEXT DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  expires_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_withdraw_requests_creator ON withdraw_requests(creator_id, status);
+CREATE INDEX IF NOT EXISTS idx_withdraw_requests_status ON withdraw_requests(status, expires_at);
+
+-- Add payout_address column to creators if it doesn't exist
+ALTER TABLE creators ADD COLUMN IF NOT EXISTS payout_address VARCHAR(64);
+

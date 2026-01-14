@@ -41,10 +41,20 @@ function buildWithdrawalTx({
 
 /**
  * Calculate withdrawal amounts
+ * @param {number} totalSats - Total amount to withdraw
+ * @param {number} feeBasisPoints - Fee in basis points (100 = 1%)
+ * @param {number} networkFeeSats - Network fee estimate in satoshis
+ * @returns {Object} Breakdown of withdrawal amounts
  */
 function calculateWithdrawalAmounts(totalSats, feeBasisPoints, networkFeeSats = 250) {
-  const serviceSats = Math.floor((totalSats * feeBasisPoints) / 10000);
+  const serviceSats = feeBasisPoints > 0 ? Math.floor((totalSats * feeBasisPoints) / 10000) : 0;
   const payoutSats = totalSats - serviceSats - networkFeeSats;
+  
+  // Ensure payout is positive
+  if (payoutSats < 0) {
+    throw new Error('Withdrawal amount too small to cover fees');
+  }
+  
   return {
     totalSats,
     serviceSats,

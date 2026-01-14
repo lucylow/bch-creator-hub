@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  DollarSign, TrendingUp, Users, Clock, RefreshCw, Plus, Wallet, Zap
+  DollarSign, TrendingUp, Users, Clock, RefreshCw, Plus, Wallet, Zap, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,10 @@ import StatCard from '@/components/Dashboard/StatCard';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import QuickActions from '@/components/Dashboard/QuickActions';
 import BalanceChart from '@/components/Dashboard/BalanceChart';
+import LiveFeed from '@/components/Dashboard/LiveFeed';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
 import { useCreator } from '@/contexts/CreatorContext';
-import { formatBCH, formatUSD } from '@/utils/formatters';
+import { formatBCH } from '@/utils/formatters';
 
 const mockTransactions = [
   { id: '1', txid: 'abc123', amountSats: 10000000, senderAddress: 'bitcoincash:qpz9...', paymentType: 'Twitter Tip', createdAt: new Date().toISOString(), status: 'confirmed' as const },
@@ -24,6 +25,7 @@ const DashboardPage = () => {
   const { creator, refreshCreator } = useCreator();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [chartPeriod, setChartPeriod] = useState<'7 days' | '30 days' | '90 days'>('30 days');
   const [stats, setStats] = useState({
     totalBalance: 125000000,
     todayEarnings: 35000000,
@@ -50,15 +52,29 @@ const DashboardPage = () => {
     return <LoadingSpinner />;
   }
 
+  const chartData = [
+    { label: 'Mon', value: 40000000 },
+    { label: 'Tue', value: 65000000 },
+    { label: 'Wed', value: 45000000 },
+    { label: 'Thu', value: 80000000 },
+    { label: 'Fri', value: 55000000 },
+    { label: 'Sat', value: 90000000 },
+    { label: 'Sun', value: 70000000 },
+  ];
+
   return (
-    <div className="min-h-screen pt-24 pb-12 px-6">
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pt-24 pb-12 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
+        >
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Welcome back, {creator?.displayName || 'Creator'}!
+            <h1 className="text-4xl font-bold text-foreground mb-2">Dashboard</h1>
+            <p className="text-muted-foreground text-lg">
+              Welcome back, <span className="text-primary font-medium">{creator?.displayName || 'Creator'}</span>!
             </p>
           </div>
           
@@ -73,13 +89,13 @@ const DashboardPage = () => {
               Refresh
             </Button>
             <Link to="/links/new">
-              <Button className="bg-gradient-primary hover:opacity-90 text-primary-foreground gap-2">
+              <Button className="bg-gradient-primary hover:opacity-90 text-primary-foreground gap-2 shadow-lg shadow-primary/20">
                 <Plus className="w-4 h-4" />
                 Create Link
               </Button>
             </Link>
           </div>
-        </div>
+        </motion.div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -87,7 +103,7 @@ const DashboardPage = () => {
             title="Total Balance"
             value={formatBCH(stats.totalBalance)}
             icon={<Wallet className="w-5 h-5" />}
-            trend={stats.todayEarnings > 0 ? '+' + formatBCH(stats.todayEarnings) : null}
+            trend={stats.todayEarnings > 0 ? `+${formatBCH(stats.todayEarnings)}` : null}
             color="primary"
           />
           <StatCard
@@ -101,7 +117,7 @@ const DashboardPage = () => {
             title="Monthly Earnings"
             value={formatBCH(stats.monthlyEarnings)}
             icon={<TrendingUp className="w-5 h-5" />}
-            trend="Monthly"
+            trend="This Month"
             color="blue"
           />
           <StatCard
@@ -122,7 +138,7 @@ const DashboardPage = () => {
             title="Network Fee"
             value="$0.002"
             icon={<Zap className="w-5 h-5" />}
-            trend="1% Fee"
+            trend="Ultra Low"
             color="red"
           />
         </div>
@@ -132,15 +148,24 @@ const DashboardPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-2 glass-card rounded-xl p-6"
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-2 glass-card rounded-xl p-6 border-border/50"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Earnings Overview</h2>
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-1">Earnings Overview</h2>
+                <p className="text-sm text-muted-foreground">Track your earnings over time</p>
+              </div>
               <div className="flex gap-2">
-                {['7 days', '30 days', '90 days'].map((period) => (
+                {(['7 days', '30 days', '90 days'] as const).map((period) => (
                   <button
                     key={period}
-                    className="px-3 py-1 text-sm rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setChartPeriod(period)}
+                    className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${
+                      chartPeriod === period
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                        : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
                   >
                     {period}
                   </button>
@@ -149,36 +174,54 @@ const DashboardPage = () => {
             </div>
             
             <BalanceChart 
-              data={stats.chartData || [
-                { label: 'Mon', value: 40000000 },
-                { label: 'Tue', value: 65000000 },
-                { label: 'Wed', value: 45000000 },
-                { label: 'Thu', value: 80000000 },
-                { label: 'Fri', value: 55000000 },
-                { label: 'Sat', value: 90000000 },
-                { label: 'Sun', value: 70000000 },
-              ]} 
+              type="area"
+              data={chartData} 
             />
           </motion.div>
           
-          <QuickActions />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <QuickActions />
+          </motion.div>
         </div>
 
-        {/* Recent Transactions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass-card rounded-xl p-6"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">Recent Transactions</h2>
-            <Link to="/analytics" className="text-sm text-primary hover:underline">
-              View All →
-            </Link>
-          </div>
-          <TransactionList transactions={mockTransactions} />
-        </motion.div>
+        {/* Transactions and Live Feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-2 glass-card rounded-xl p-6 border-border/50"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-1">Recent Transactions</h2>
+                <p className="text-sm text-muted-foreground">Your latest payment activity</p>
+              </div>
+              <Link 
+                to="/analytics" 
+                className="text-sm text-primary hover:underline font-medium flex items-center gap-1"
+              >
+                View All
+                <span>→</span>
+              </Link>
+            </div>
+            <TransactionList transactions={mockTransactions} limit={5} />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            {creator?.id && (
+              <LiveFeed creatorId={creator.id} />
+            )}
+          </motion.div>
+        </div>
       </div>
     </div>
   );

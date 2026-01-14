@@ -11,7 +11,7 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MARKETPLACE_ADDRESS } from '@/lib/web3/providers/EVMProvider';
 
-// Marketplace ABI
+// Marketplace ABI (minimal - full ABI available after compilation)
 const MARKETPLACE_ABI = [
   {
     type: 'function',

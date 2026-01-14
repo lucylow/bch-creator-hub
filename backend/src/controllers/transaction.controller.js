@@ -1,5 +1,6 @@
 const Transaction = require('../models/Transaction');
 const Creator = require('../models/Creator');
+const MicropaymentService = require('../services/micropayment.service');
 const logger = require('../utils/logger');
 const { NotFoundError, AppError } = require('../utils/errors');
 
@@ -82,9 +83,116 @@ class TransactionController {
         period === 'all' ? null : new Date()
       );
 
+      // Get micro-payment stats
+      const micropaymentStats = await MicropaymentService.getMicropaymentStats(
+        creatorId,
+        startDate,
+        period === 'all' ? null : new Date()
+      );
+
       res.json({
         success: true,
-        data: stats
+        data: {
+          ...stats,
+          micropayments: micropaymentStats
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get micro-payment analytics
+  async getMicropaymentStats(req, res, next) {
+    try {
+      const creatorId = req.creator.creator_id;
+      const { period = '30d' } = req.query;
+
+      // Calculate date range
+      let startDate = new Date();
+      switch (period) {
+        case '7d':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(startDate.getDate() - 30);
+          break;
+        case '90d':
+          startDate.setDate(startDate.getDate() - 90);
+          break;
+        case 'all':
+          startDate = null;
+          break;
+        default:
+          startDate.setDate(startDate.getDate() - 30);
+      }
+
+      const stats = await MicropaymentService.getMicropaymentStats(
+        creatorId,
+        startDate,
+        period === 'all' ? null : new Date()
+      );
+
+      // Get recommendations
+      const recommendations = await MicropaymentService.getRecommendations(creatorId);
+
+      res.json({
+        success: true,
+        data: {
+          stats,
+          recommendations: recommendations.recommendations,
+          batchSummary: recommendations.batchSummary
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get batchable payments
+  async getBatchablePayments(req, res, next) {
+    try {
+      const creatorId = req.creator.creator_id;
+      const { limit = 10 } = req.query;
+
+      const batchablePayments = await MicropaymentService.getBatchablePayments(
+        creatorId,
+        parseInt(limit)
+      );
+
+      const batchSummary = batchablePayments.length > 0
+        ? MicropaymentService.calculateBatchSummary(batchablePayments)
+        : null;
+
+      res.json({
+        success: true,
+        data: {
+          payments: batchablePayments,
+          batchSummary
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Analyze payment efficiency
+  async analyzePaymentEfficiency(req, res, next) {
+    try {
+      const { amountSats, feeSats } = req.body;
+
+      if (!amountSats) {
+        throw new AppError('Amount is required', 400);
+      }
+
+      const BCHService = require('../services/bch.service');
+      const estimatedFee = feeSats || BCHService.estimateFee().sats;
+      
+      const analysis = MicropaymentService.analyzePaymentEfficiency(amountSats, estimatedFee);
+
+      res.json({
+        success: true,
+        data: analysis
       });
     } catch (error) {
       next(error);

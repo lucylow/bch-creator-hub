@@ -8,9 +8,15 @@ export const ADDRESSES = {
   platform: "bitcoincash:qzplatform0000000000000000000000",
   creatorAlice: "bitcoincash:qpalice000000000000000000000000",
   creatorBob: "bitcoincash:qpbbob0000000000000000000000000",
+  creatorCharlie: "bitcoincash:qpcharlie000000000000000000000",
+  creatorDiana: "bitcoincash:qpdiana00000000000000000000000",
   userLucy: "bitcoincash:qplucy0000000000000000000000000",
   userJudge: "bitcoincash:qpjjudge00000000000000000000000",
+  userMark: "bitcoincash:qpmark0000000000000000000000000",
+  userNina: "bitcoincash:qpnina0000000000000000000000000",
   daoTreasury: "bitcoincash:qpdao000000000000000000000000",
+  daoVoting: "bitcoincash:qpdaovote000000000000000000000",
+  treasuryCold: "bitcoincash:qptreasurycold00000000000000",
 };
 
 /**

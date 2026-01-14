@@ -13,9 +13,13 @@ const transactionRoutes = require('./routes/transaction.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const publicRoutes = require('./routes/public.routes');
 const payloadRoutes = require('./routes/payload.routes');
+const subscriptionRoutes = require('./routes/subscription.routes');
+const withdrawalRoutes = require('./routes/withdrawal.routes');
+const contractWithdrawRoutes = require('./routes/contract-withdraw.routes');
 
 const errorHandler = require('./middleware/error.middleware');
 const { apiLimiter } = require('./middleware/auth.middleware');
+const requestIdMiddleware = require('./middleware/requestId.middleware');
 
 const { initDatabase } = require('./config/database');
 const TransactionScanner = require('./jobs/transactionScanner.job');
@@ -39,6 +43,9 @@ class App {
   }
 
   initializeMiddlewares() {
+    // Request ID - should be first to track all requests
+    this.app.use(requestIdMiddleware);
+    
     // Security headers
     this.app.use(helmet());
     
@@ -79,6 +86,9 @@ class App {
     this.app.use('/api/transactions', transactionRoutes);
     this.app.use('/api/webhooks', webhookRoutes);
     this.app.use('/api/public', publicRoutes);
+    this.app.use('/api/subscriptions', subscriptionRoutes);
+    this.app.use('/api/withdrawals', withdrawalRoutes);
+    this.app.use('/api/contract', contractWithdrawRoutes);
     this.app.use('/api', payloadRoutes);
     
     // Bull Board for queue monitoring
@@ -88,15 +98,11 @@ class App {
     }
     
     // 404 handler
-    this.app.use('*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        error: 'Route not found'
-      });
-    });
+    this.app.use('*', errorHandler.notFoundHandler);
   }
 
   initializeErrorHandling() {
+    // Use enhanced error handler
     this.app.use(errorHandler.errorHandler);
   }
 

@@ -1,0 +1,55 @@
+pragma cashscript ^0.10.0;
+
+/*
+  RevenueSplitter.cash
+
+  Minimal on-chain logic:
+   - Creator must sign withdraws
+   - Withdraw transaction must send:
+       outputs[0] -> creator P2PKH (>= expected creator amount)
+       outputs[1] -> service P2PKH (>= serviceSats)  IF feeBps > 0
+   - Uses constructor args:
+       bytes20 creatorPkh   (20-byte pubkey-hash for creator payout)
+       bytes20 servicePkh   (20-byte pubkey-hash for service)
+       pubkey   creatorPubKey
+       int      feeBps      (basis points: 100 == 1.00%)
+*/
+
+contract RevenueSplitter(bytes20 creatorPkh, bytes20 servicePkh, pubkey creatorPubKey, int feeBps) {
+
+  function withdraw(sig creatorSig) {
+    // 1) verify creator signature
+    require(checkSig(creatorSig, creatorPubKey));
+
+    // 2) we must have an input (contract UTXO)
+    require(tx.inputs.length >= 1);
+    require(tx.outputs.length >= 1);
+
+    // 3) compute available input value from the active input
+    int inputValue = tx.inputs[this.activeInputIndex].value;
+
+    // 4) compute service cut (integer math)
+    int serviceSats = (inputValue * feeBps) / 10000;
+
+    // 5) allow small miner allowance to let builders include fee/change (tune as needed)
+    int minerAllowance = 1000;
+
+    // 6) expected minimum creator payout
+    int expectedCreatorMin = inputValue - serviceSats - minerAllowance;
+    require(expectedCreatorMin >= 0);
+
+    // 7) verify output[0] pays creator P2PKH with enough sats
+    bytes creatorLocking = new LockingBytecodeP2PKH(creatorPkh);
+    require(tx.outputs[0].lockingBytecode == creatorLocking);
+    require(tx.outputs[0].value >= expectedCreatorMin);
+
+    // 8) if a fee is configured, ensure second output pays service with at least serviceSats
+    if (feeBps > 0) {
+      bytes serviceLocking = new LockingBytecodeP2PKH(servicePkh);
+      require(tx.outputs.length >= 2);
+      require(tx.outputs[1].lockingBytecode == serviceLocking);
+      require(tx.outputs[1].value >= serviceSats);
+    }
+  }
+}
+

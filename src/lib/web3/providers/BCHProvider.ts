@@ -71,14 +71,23 @@ export class BCHProvider {
 
     const win = window as any;
     
-    // Check for Paytaca wallet
+    // Check for Paytaca wallet (most popular BCH wallet)
     if (win.paytaca) {
-      wallets.paytaca = {
-        name: 'Paytaca',
-        icon: '🦜',
-        supportsBIP322: true,
-        instance: win.paytaca
-      };
+      try {
+        // Verify Paytaca is actually functional
+        const isConnected = typeof win.paytaca.isConnected === 'function' 
+          ? win.paytaca.isConnected() 
+          : true;
+        
+        wallets.paytaca = {
+          name: 'Paytaca',
+          icon: '🦜',
+          supportsBIP322: true,
+          instance: win.paytaca
+        };
+      } catch (error) {
+        console.warn('Paytaca wallet detected but not functional:', error);
+      }
     }
     
     // Check for Electron Cash via WebUSB
@@ -101,6 +110,16 @@ export class BCHProvider {
       };
     }
     
+    // Check for Libauth-based wallets
+    if (win.libauth) {
+      wallets.libauth = {
+        name: 'Libauth Wallet',
+        icon: '🔐',
+        supportsBIP322: true,
+        instance: win.libauth
+      };
+    }
+    
     // Check for Wallet Connect
     if (win.walletConnectProvider) {
       wallets.walletConnect = {
@@ -119,10 +138,20 @@ export class BCHProvider {
 
   async connectWallet(walletType = 'generic'): Promise<WalletData> {
     try {
+      // Refresh wallet detection first
+      await this.checkWalletInjection();
+      
       const wallet = this.wallets[walletType];
       
       if (!wallet) {
-        throw new Error(`Wallet ${walletType} not available`);
+        // Provide helpful error message based on wallet type
+        if (walletType === 'paytaca') {
+          throw new Error('Paytaca wallet not detected. Please install the Paytaca browser extension from https://paytaca.com');
+        } else if (walletType === 'electron-cash') {
+          throw new Error('Electron Cash not detected. Please connect your hardware device or install the Electron Cash app.');
+        } else {
+          throw new Error(`Wallet "${walletType}" not available. Please ensure a compatible Bitcoin Cash wallet is installed.`);
+        }
       }
 
       let accounts: string[] = [];
@@ -132,29 +161,48 @@ export class BCHProvider {
           accounts = await this.connectPaytaca(wallet.instance);
           break;
         case 'electronCash':
+        case 'electron-cash':
           accounts = await this.connectElectronCash(wallet.instance);
           break;
         case 'walletConnect':
           accounts = await this.connectWalletConnect(wallet.instance);
+          break;
+        case 'libauth':
+          accounts = await this.connectLibauth(wallet.instance);
           break;
         default:
           accounts = await this.connectGeneric(wallet.instance);
       }
 
       if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts returned from wallet');
+        throw new Error('No accounts returned from wallet. Please ensure your wallet is unlocked and contains at least one account.');
       }
 
+      // Validate address format
       const address = accounts[0];
+      if (!this.isValidAddress(address)) {
+        throw new Error('Invalid Bitcoin Cash address returned from wallet');
+      }
       
       // Authenticate with backend
-      const authResult = await this.authenticate(address, walletType);
+      let authResult: { token?: string } = {};
+      try {
+        authResult = await this.authenticate(address, walletType);
+      } catch (authError) {
+        console.warn('Backend authentication failed, continuing with local connection', authError);
+        // Continue without backend auth for demo/offline mode
+      }
       
       // Load wallet balance
       const balance = await this.getBalance(address);
       
-      // Get UTXOs
-      const utxos = await this.getUTXOs(address);
+      // Get UTXOs (non-blocking)
+      let utxos: any[] = [];
+      try {
+        utxos = await this.getUTXOs(address);
+      } catch (utxoError) {
+        console.warn('UTXO fetch failed, continuing without UTXO data', utxoError);
+      }
       
       const walletData: WalletData = {
         type: walletType,
@@ -162,7 +210,7 @@ export class BCHProvider {
         balance,
         utxos,
         wallet: wallet.instance,
-        authenticated: true,
+        authenticated: !!authResult.token,
         authToken: authResult.token
       };
       
@@ -172,6 +220,9 @@ export class BCHProvider {
       // Store in localStorage
       this.persistWalletState(walletData);
       
+      // Set up account change listeners
+      this.setupAccountChangeListeners(walletType, wallet.instance);
+      
       // Emit events
       this.emit('connected', walletData);
       this.emit('balanceUpdate', balance);
@@ -179,10 +230,93 @@ export class BCHProvider {
       return walletData;
       
     } catch (error) {
-      console.error('Wallet connection failed:', error);
-      this.emit('error', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Wallet connection failed:', errorMessage);
+      this.emit('error', { type: 'connection', message: errorMessage, walletType });
       throw error;
     }
+  }
+
+  private isValidAddress(address: string): boolean {
+    // Basic CashAddr validation
+    const cashAddrRegex = /^(bitcoincash:|bchtest:|bchreg:)?[qp][a-z0-9]{41}$/i;
+    return cashAddrRegex.test(address);
+  }
+
+  private async connectLibauth(libauth: any): Promise<string[]> {
+    try {
+      if (typeof libauth.requestAccounts === 'function') {
+        const accounts = await libauth.requestAccounts();
+        return Array.isArray(accounts) ? accounts : [accounts];
+      }
+      
+      throw new Error('Libauth wallet does not support connection');
+    } catch (error) {
+      throw new Error('Libauth connection failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  }
+
+  private setupAccountChangeListeners(walletType: string, walletInstance: any) {
+    try {
+      // Listen for account changes from wallet
+      if (typeof walletInstance.on === 'function') {
+        walletInstance.on('accountsChanged', (accounts: string[]) => {
+          if (accounts && accounts.length > 0 && this.currentWallet) {
+            const newAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+            if (newAddress !== this.currentWallet.address) {
+              this.handleAccountChange(newAddress);
+            }
+          }
+        });
+      }
+      
+      // Also listen for disconnect events
+      if (typeof walletInstance.on === 'function') {
+        walletInstance.on('disconnect', () => {
+          this.handleDisconnect();
+        });
+      }
+    } catch (error) {
+      console.debug('Could not set up account change listeners:', error);
+    }
+  }
+
+  private async handleAccountChange(newAddress: string) {
+    if (!this.currentWallet) return;
+    
+    try {
+      this.currentWallet.address = newAddress;
+      
+      // Update balance
+      const balance = await this.getBalance(newAddress);
+      this.currentWallet.balance = balance;
+      
+      // Persist new state
+      this.persistWalletState(this.currentWallet);
+      
+      // Emit events
+      this.emit('accountChanged', { address: newAddress });
+      this.emit('balanceUpdate', balance);
+      
+      // Dispatch custom event for other parts of the app
+      window.dispatchEvent(new CustomEvent('walletAccountChanged', { detail: newAddress }));
+    } catch (error) {
+      console.error('Failed to handle account change:', error);
+    }
+  }
+
+  private handleDisconnect() {
+    this.connected = false;
+    this.currentWallet = null;
+    this.emit('disconnected');
+    
+    // Clear localStorage
+    localStorage.removeItem('bch_wallet_state');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('wallet_address');
+    
+    // Dispatch custom event
+    window.dispatchEvent(new CustomEvent('walletDisconnected'));
   }
 
   private async connectGeneric(wallet: any): Promise<string[]> {
@@ -209,10 +343,60 @@ export class BCHProvider {
 
   private async connectPaytaca(paytaca: any): Promise<string[]> {
     try {
-      const accounts = await paytaca.getAccounts();
-      return Array.isArray(accounts) ? accounts : [accounts];
+      // Try multiple connection methods for Paytaca
+      let accounts: string[] = [];
+      
+      // Method 1: Direct getAccounts
+      if (typeof paytaca.getAccounts === 'function') {
+        try {
+          const result = await paytaca.getAccounts();
+          accounts = Array.isArray(result) ? result : [result];
+          if (accounts.length > 0) return accounts;
+        } catch (e) {
+          console.debug('Paytaca getAccounts failed, trying request method');
+        }
+      }
+      
+      // Method 2: EIP-1193 style request
+      if (typeof paytaca.request === 'function') {
+        try {
+          const result = await paytaca.request({ method: 'bch_requestAccounts' });
+          accounts = Array.isArray(result) ? result : [result];
+          if (accounts.length > 0) return accounts;
+        } catch (e) {
+          console.debug('Paytaca request method failed, trying enable');
+        }
+      }
+      
+      // Method 3: Legacy enable method
+      if (typeof paytaca.enable === 'function') {
+        try {
+          const result = await paytaca.enable();
+          accounts = Array.isArray(result) ? result : [result];
+          if (accounts.length > 0) return accounts;
+        } catch (e) {
+          console.debug('Paytaca enable method failed');
+        }
+      }
+      
+      if (accounts.length === 0) {
+        throw new Error('No accounts returned from Paytaca wallet. Please ensure the wallet is unlocked.');
+      }
+      
+      return accounts;
     } catch (error) {
-      throw new Error('Paytaca connection failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Provide helpful error messages
+      if (errorMessage.includes('User rejected') || errorMessage.includes('denied')) {
+        throw new Error('Connection rejected. Please approve the connection in your Paytaca wallet.');
+      }
+      
+      if (errorMessage.includes('locked') || errorMessage.includes('unlocked')) {
+        throw new Error('Please unlock your Paytaca wallet and try again.');
+      }
+      
+      throw new Error(`Paytaca connection failed: ${errorMessage}`);
     }
   }
 
@@ -283,13 +467,48 @@ export class BCHProvider {
 
   private async signMessageBIP322(address: string, message: string, wallet: any): Promise<string> {
     try {
-      if (wallet.signMessage && wallet.signMessage.length === 3) {
-        return await wallet.signMessage(address, message, 'bip322');
+      // Method 1: Direct signMessage with 3 parameters (address, message, format)
+      if (typeof wallet.signMessage === 'function' && wallet.signMessage.length >= 2) {
+        try {
+          // Try with 3 params first (address, message, 'bip322')
+          if (wallet.signMessage.length >= 3) {
+            return await wallet.signMessage(address, message, 'bip322');
+          }
+          // Try with 2 params (address, message) - some wallets auto-detect format
+          return await wallet.signMessage(address, message);
+        } catch (e) {
+          console.debug('Direct signMessage failed, trying request method');
+        }
       }
       
+      // Method 2: EIP-1193 style request
+      if (typeof wallet.request === 'function') {
+        try {
+          const signature = await wallet.request({
+            method: 'bch_signMessage',
+            params: [address, message, 'bip322']
+          });
+          if (signature) return signature;
+        } catch (e) {
+          console.debug('Request method BIP-322 failed, trying without format specifier');
+          try {
+            // Try without explicit format - wallet may default to BIP-322
+            const signature = await wallet.request({
+              method: 'bch_signMessage',
+              params: [address, message]
+            });
+            if (signature) return signature;
+          } catch (e2) {
+            console.debug('Request method without format failed');
+          }
+        }
+      }
+      
+      // Method 3: Legacy signing (some wallets support BIP-322 but don't expose it)
       return await this.signMessageLegacy(address, message, wallet);
     } catch (error) {
-      console.warn('BIP-322 signing failed, using fallback:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn('BIP-322 signing failed, using fallback:', errorMessage);
       return this.signMessageLegacy(address, message, wallet);
     }
   }
@@ -459,11 +678,53 @@ export class BCHProvider {
     this.currentWallet = null;
     this.contracts = {};
     
+    // Clean up listeners if possible
+    if (this.currentWallet?.wallet && typeof this.currentWallet.wallet.removeListener === 'function') {
+      try {
+        this.currentWallet.wallet.removeListener('accountsChanged', () => {});
+        this.currentWallet.wallet.removeListener('disconnect', () => {});
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+    
     localStorage.removeItem('bch_wallet_state');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('wallet_address');
     
     this.emit('disconnected');
+    
+    // Dispatch custom event
+    window.dispatchEvent(new CustomEvent('walletDisconnected'));
+  }
+
+  async reconnect(): Promise<WalletData | null> {
+    try {
+      const savedState = localStorage.getItem('bch_wallet_state');
+      if (!savedState) {
+        return null;
+      }
+      
+      const state = JSON.parse(savedState);
+      if (!state.walletType || !state.address) {
+        return null;
+      }
+      
+      // Check if wallet is still available
+      await this.checkWalletInjection();
+      if (!this.wallets[state.walletType]) {
+        // Wallet no longer available, clear state
+        localStorage.removeItem('bch_wallet_state');
+        return null;
+      }
+      
+      // Attempt to reconnect
+      return await this.connectWallet(state.walletType);
+    } catch (error) {
+      console.error('Reconnection failed:', error);
+      localStorage.removeItem('bch_wallet_state');
+      return null;
+    }
   }
 
   on(event: string, listener: EventListener) {

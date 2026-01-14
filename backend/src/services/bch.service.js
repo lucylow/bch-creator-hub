@@ -25,19 +25,50 @@ class BCHService {
   }
 
   // Get address balance
-  async getBalance(address) {
-    try {
-      const balance = await this.bchjs.Electrumx.balance(address);
-      
-      return {
-        confirmed: balance.balance.confirmed,
-        unconfirmed: balance.balance.unconfirmed,
-        total: balance.balance.confirmed + balance.balance.unconfirmed
-      };
-    } catch (error) {
-      logger.error('Balance check error:', error);
-      throw new ExternalServiceError('BCH Service', `Failed to get balance for ${address}: ${error.message}`);
+  async getBalance(address, retries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const balance = await this.bchjs.Electrumx.balance(address);
+        
+        return {
+          confirmed: balance.balance.confirmed,
+          unconfirmed: balance.balance.unconfirmed,
+          total: balance.balance.confirmed + balance.balance.unconfirmed
+        };
+      } catch (error) {
+        lastError = error;
+        
+        // Check if error is retryable
+        const isRetryable = error.code === 'ECONNREFUSED' || 
+                           error.code === 'ETIMEDOUT' || 
+                           error.code === 'ENOTFOUND' ||
+                           error.response?.status >= 500;
+        
+        if (!isRetryable || attempt === retries) {
+          logger.error('Balance check error:', {
+            address,
+            attempt,
+            error: {
+              message: error.message,
+              code: error.code,
+              status: error.response?.status
+            }
+          });
+          throw new ExternalServiceError('BCH Service', `Failed to get balance for ${address}: ${error.message}`, {
+            context: { address, attempts: attempt },
+            retryable: isRetryable
+          });
+        }
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+        logger.warn(`Balance check retry ${attempt}/${retries} for ${address}`);
+      }
     }
+    
+    throw lastError;
   }
 
   // Decode OP_RETURN data
@@ -104,14 +135,42 @@ class BCHService {
   }
 
   // Get transaction details
-  async getTransaction(txid) {
-    try {
-      const tx = await this.bchjs.Blockbook.tx(txid);
-      return tx;
-    } catch (error) {
-      logger.error(`Error fetching transaction ${txid}:`, error);
-      throw error;
+  async getTransaction(txid, retries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const tx = await this.bchjs.Blockbook.tx(txid);
+        return tx;
+      } catch (error) {
+        lastError = error;
+        
+        const isRetryable = error.code === 'ECONNREFUSED' || 
+                           error.code === 'ETIMEDOUT' || 
+                           error.response?.status >= 500;
+        
+        if (!isRetryable || attempt === retries) {
+          logger.error(`Error fetching transaction ${txid}:`, {
+            txid,
+            attempt,
+            error: {
+              message: error.message,
+              code: error.code,
+              status: error.response?.status
+            }
+          });
+          throw new ExternalServiceError('BCH Service', `Failed to get transaction ${txid}: ${error.message}`, {
+            context: { txid, attempts: attempt },
+            retryable: isRetryable
+          });
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+        logger.warn(`Transaction fetch retry ${attempt}/${retries} for ${txid}`);
+      }
     }
+    
+    throw lastError;
   }
 
   // Get current block height
@@ -126,39 +185,77 @@ class BCHService {
   }
 
   // Estimate transaction fee
-  estimateFee(numInputs = 1, numOutputs = 2) {
-    // Simple fee estimation for hackathon
-    const typicalTxSize = 226; // bytes for typical transaction
+  estimateFee(numInputs = 1, numOutputs = 2, priority = 'normal') {
+    const { MICROPAYMENT } = require('../config/constants');
+    
+    // Use optimized fee calculation for micro-payments
     const estimatedSize = (numInputs * 148) + (numOutputs * 34) + 10;
-    const fee = Math.ceil(estimatedSize * this.feePerByte);
+    
+    let feePerByte = this.feePerByte;
+    if (priority === 'fast') {
+      feePerByte = MICROPAYMENT.FAST_FEE_PER_BYTE;
+    } else if (priority === 'low') {
+      feePerByte = MICROPAYMENT.MIN_FEE_PER_BYTE;
+    }
+    
+    const fee = Math.ceil(estimatedSize * feePerByte);
     
     return {
       sats: fee,
       usd: fee / 100000000 * 250, // Assuming $250/BCH
-      size: estimatedSize
+      size: estimatedSize,
+      feePerByte,
+      priority
     };
   }
 
   // Broadcast raw transaction
-  async broadcastTransaction(rawTx) {
-    try {
-      const result = await this.bchjs.RawTransactions.sendRawTransaction(rawTx);
-      
-      if (result && result.length === 64) { // Valid txid
-        return {
-          success: true,
-          txid: result
-        };
-      } else {
-        throw new Error('Invalid transaction ID returned');
+  async broadcastTransaction(rawTx, retries = 2) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const result = await this.bchjs.RawTransactions.sendRawTransaction(rawTx);
+        
+        if (result && result.length === 64) { // Valid txid
+          return {
+            success: true,
+            txid: result
+          };
+        } else {
+          throw new Error('Invalid transaction ID returned');
+        }
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on validation errors
+        const isRetryable = (error.code === 'ECONNREFUSED' || 
+                            error.code === 'ETIMEDOUT' ||
+                            error.message?.includes('already have transaction') === false) &&
+                           error.message?.includes('rejected') === false;
+        
+        if (!isRetryable || attempt === retries) {
+          logger.error('Broadcast error:', {
+            attempt,
+            error: {
+              message: error.message,
+              code: error.code
+            },
+            txLength: rawTx?.length
+          });
+          
+          throw new ExternalServiceError('BCH Service', `Failed to broadcast transaction: ${error.message}`, {
+            context: { attempts: attempt },
+            retryable: isRetryable
+          });
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+        logger.warn(`Broadcast retry ${attempt}/${retries}`);
       }
-    } catch (error) {
-      logger.error('Broadcast error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
     }
+    
+    throw lastError;
   }
 
   // Check if transaction is confirmed
@@ -172,14 +269,42 @@ class BCHService {
   }
 
   // Get address UTXOs
-  async getUtxos(address) {
-    try {
-      const utxos = await this.bchjs.Blockbook.utxo(address);
-      return utxos;
-    } catch (error) {
-      logger.error(`Error getting UTXOs for ${address}:`, error);
-      throw new ExternalServiceError('BCH Service', `Failed to get UTXOs for ${address}: ${error.message}`);
+  async getUtxos(address, retries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const utxos = await this.bchjs.Blockbook.utxo(address);
+        return utxos;
+      } catch (error) {
+        lastError = error;
+        
+        const isRetryable = error.code === 'ECONNREFUSED' || 
+                           error.code === 'ETIMEDOUT' || 
+                           error.response?.status >= 500;
+        
+        if (!isRetryable || attempt === retries) {
+          logger.error(`Error getting UTXOs for ${address}:`, {
+            address,
+            attempt,
+            error: {
+              message: error.message,
+              code: error.code,
+              status: error.response?.status
+            }
+          });
+          throw new ExternalServiceError('BCH Service', `Failed to get UTXOs for ${address}: ${error.message}`, {
+            context: { address, attempts: attempt },
+            retryable: isRetryable
+          });
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+        logger.warn(`UTXO fetch retry ${attempt}/${retries} for ${address}`);
+      }
     }
+    
+    throw lastError;
   }
 
   // Convert satoshis to BCH
