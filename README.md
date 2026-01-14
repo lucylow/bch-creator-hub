@@ -7,8 +7,12 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.8-blue.svg)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/postgresql-14+-blue.svg)](https://www.postgresql.org/)
+[![CashScript](https://img.shields.io/badge/cashscript-0.8+-orange.svg)](https://cashscript.org/)
 
 *One QR code. One dashboard. Unlimited payments on Bitcoin Cash.*
+
+[Features](#key-features) • [Quick Start](#quick-start) • [Documentation](#table-of-contents) • [Contributing](#contributing)
 
 </div>
 
@@ -17,57 +21,158 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Key Features](#key-features)
+- [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [System Components](#system-components)
 - [Smart Contracts](#smart-contracts)
 - [Payment Flow](#payment-flow)
+- [Installation & Setup](#installation--setup)
 - [API Documentation](#api-documentation)
 - [Database Schema](#database-schema)
-- [Installation & Setup](#installation--setup)
 - [Deployment](#deployment)
 - [Security](#security)
 - [Performance](#performance)
 - [Development](#development)
+- [Use Cases](#use-cases)
+- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 ## Overview
 
-BCH Creator Hub is a decentralized payment platform built on Bitcoin Cash (BCH) that enables creators to receive payments through a unified interface. The platform leverages CashScript smart contracts, OP_RETURN metadata, and real-time blockchain indexing to provide a non-custodial, low-fee payment solution.
+**BCH Creator Hub** is a decentralized payment platform built on Bitcoin Cash (BCH) that enables creators to receive payments through a unified interface. The platform leverages CashScript smart contracts, OP_RETURN metadata, and real-time blockchain indexing to provide a non-custodial, low-fee payment solution for content creators, artists, developers, and entrepreneurs.
 
-### Key Features
+### What Problem Does It Solve?
+
+Traditional payment solutions for creators often involve:
+- High transaction fees (3-5% or more)
+- Centralized custody of funds
+- Complex setup and integration
+- Long payout periods
+- Limited payment options
+
+**BCH Creator Hub** solves these problems by providing:
+- ✅ **Low fees**: Maximum 1% (configurable to 0%)
+- ✅ **Non-custodial**: Funds held in smart contracts, not by a third party
+- ✅ **Fast payouts**: Withdraw anytime, directly to your wallet
+- ✅ **Unified interface**: One QR code for all payment types
+- ✅ **Real-time updates**: Instant transaction notifications
+- ✅ **Bitcoin Cash benefits**: Low fees, fast confirmations, reliable network
+
+---
+
+## Key Features
+
+### 🎯 Core Features
 
 - **Non-Custodial Design**: Creators maintain full control over their funds via smart contracts
-- **Unified Payment Interface**: Single QR code and address for all payment types
+- **Unified Payment Interface**: Single QR code and address for all payment types (tips, subscriptions, paywalls)
 - **Real-Time Updates**: WebSocket-based live transaction notifications
 - **CashToken Subscriptions**: NFT-based subscription passes for premium content
 - **Low Fees**: Maximum 1% service fee (configurable to 0%)
 - **Developer API**: RESTful API for custom integrations
 - **OP_RETURN Routing**: Metadata-encoded payments for flexible payment types
 
-### Technology Stack
+### 🛡️ Security Features
 
-**Frontend**
-- React 18.3+ with TypeScript
-- Vite 5.4+ for build tooling
-- Tailwind CSS + shadcn/ui components
-- React Query for state management
-- WebSocket client for real-time updates
+- **BIP-322 Message Signing**: Wallet-based authentication without private key exposure
+- **Smart Contract Security**: Audited contracts with minimal attack surface
+- **No Admin Keys**: No upgradeable or admin-controlled functions
+- **Time Locks**: Emergency withdrawal available after 30 days
+- **Signature Verification**: All withdrawals require creator signature
 
-**Backend**
-- Node.js 18+ with Express 4.18+
-- PostgreSQL 14+ for persistent storage
-- Redis 4.6+ for caching and sessions
-- CashScript 0.8+ for smart contracts
-- Zeromq for blockchain event streaming
-- Bull for job queue management
+### ⚡ Performance Features
 
-**Blockchain**
-- Bitcoin Cash (BCH) Mainnet/Testnet
-- CashScript smart contracts
-- BCH-2023-02 CashTokens
-- BIP-322 message signing
+- **ZMQ Indexing**: Real-time block notifications (no polling)
+- **Redis Caching**: Fast balance and session management
+- **Connection Pooling**: Optimized database connections
+- **WebSocket**: Efficient real-time communication
+- **Batch Processing**: Efficient transaction handling
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+Before you begin, ensure you have:
+
+- **Node.js** 18.0.0 or higher
+- **PostgreSQL** 14.0 or higher
+- **Redis** 6.0 or higher
+- **npm** or **yarn** package manager
+
+### Installation Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/bch-creator-hub.git
+   cd bch-creator-hub
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Install root dependencies
+   npm install
+   
+   # Install backend dependencies
+   cd backend
+   npm install
+   cd ..
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   # Backend
+   cd backend
+   cp .env.example .env
+   # Edit .env with your configuration
+   
+   # Frontend
+   cd ..
+   cp .env.example .env
+   # Edit .env with your API URL
+   ```
+
+4. **Initialize the database**
+   ```bash
+   cd backend
+   npm run db:migrate
+   npm run db:seed
+   ```
+
+5. **Start the development servers**
+   ```bash
+   # Terminal 1: Start backend (from backend/)
+   cd backend
+   npm run dev
+   
+   # Terminal 2: Start frontend (from root)
+   npm run dev
+   ```
+
+6. **Access the application**
+   - Frontend: http://localhost:8080
+   - Backend API: http://localhost:3001
+
+### Docker Quick Start
+
+For a faster setup using Docker:
+
+```bash
+docker-compose up -d
+```
+
+This will start:
+- PostgreSQL database
+- Redis cache
+- Backend API server
+- Frontend application
+
+See the [Deployment](#deployment) section for detailed Docker configuration.
 
 ---
 
@@ -399,6 +504,37 @@ CREATE TABLE blocks (
 
 ---
 
+## Smart Contracts
+
+### CreatorRouter Contract
+
+The main payment routing contract that aggregates payments and handles withdrawals.
+
+**Features**:
+- Accepts payments via P2SH or direct transactions
+- Stores funds in contract address
+- Allows creator to withdraw with signature
+- Optional service fee (configurable 0-2%)
+- Emergency withdrawal after 30-day lock period
+
+**Deployment**:
+```bash
+cd backend
+npm run deploy:contracts
+```
+
+### SubscriptionPass Contract
+
+CashToken-based subscription system using NFT passes.
+
+**Features**:
+- Mint subscription NFTs on purchase
+- Store expiration time in NFT commitment
+- Transferable subscription passes
+- Automatic expiration checking
+
+---
+
 ## Payment Flow
 
 ### Standard Payment Flow
@@ -486,6 +622,132 @@ sequenceDiagram
     D->>SC: Verify NFT ownership
     SC->>SC: Check expiration time
     SC-->>D: Grant/deny access
+```
+
+---
+
+## Installation & Setup
+
+### Prerequisites
+
+- Node.js 18.0.0 or higher
+- PostgreSQL 14.0 or higher
+- Redis 6.0 or higher
+- Bitcoin Cash node (BCHN or Flowee) with ZMQ enabled (for production)
+- npm or yarn package manager
+
+### Backend Setup
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/bch-creator-hub.git
+   cd bch-creator-hub/backend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**:
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env`:
+   ```env
+   # Server
+   PORT=3001
+   NODE_ENV=development
+
+   # Database
+   DATABASE_URL=postgresql://user:password@localhost:5432/bch_creator_hub
+   DB_POOL_MAX=20
+
+   # Redis
+   REDIS_URL=redis://localhost:6379
+
+   # Blockchain
+   BCH_NETWORK=testnet
+   ZMQ_URL=tcp://127.0.0.1:28332
+   BCHJS_REST_URL=https://rest.kingbch.com/v5/
+   BCHJS_API_TOKEN=your_token_here
+
+   # JWT
+   JWT_SECRET=your_secret_key_here
+   JWT_EXPIRES_IN=7d
+
+   # CORS
+   ALLOWED_ORIGINS=http://localhost:8080,http://localhost:3000
+
+   # Service
+   SERVICE_FEE_BASIS_POINTS=100
+   SERVICE_PUBKEY=your_service_pubkey_here
+   ```
+
+4. **Initialize database**:
+   ```bash
+   npm run db:migrate
+   npm run db:seed
+   ```
+
+5. **Deploy smart contracts** (testnet):
+   ```bash
+   npm run deploy:contracts
+   ```
+
+6. **Start the server**:
+   ```bash
+   # Development
+   npm run dev
+
+   # Production
+   npm start
+   ```
+
+### Frontend Setup
+
+1. **Navigate to project root**:
+   ```bash
+   cd ..
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment**:
+   Create `.env`:
+   ```env
+   VITE_API_URL=http://localhost:3001
+   VITE_WS_URL=ws://localhost:3001
+   VITE_BCH_NETWORK=testnet
+   ```
+
+4. **Start development server**:
+   ```bash
+   npm run dev
+   ```
+
+   The frontend will be available at `http://localhost:8080`
+
+### Bitcoin Cash Node Configuration
+
+Configure your BCH node to enable ZMQ notifications:
+
+**bitcoin.conf** (BCHN):
+```conf
+zmqpubhashblock=tcp://127.0.0.1:28332
+zmqpubhashtx=tcp://127.0.0.1:28333
+zmqpubrawblock=tcp://127.0.0.1:28334
+zmqpubrawtx=tcp://127.0.0.1:28335
+```
+
+**bchd.conf** (BCHD):
+```conf
+zmqpubhashblock=tcp://127.0.0.1:28332
+zmqpubhashtx=tcp://127.0.0.1:28333
 ```
 
 ---
@@ -651,151 +913,9 @@ erDiagram
 
 ---
 
-## Installation & Setup
-
-### Prerequisites
-
-- Node.js 18.0.0 or higher
-- PostgreSQL 14.0 or higher
-- Redis 6.0 or higher
-- Bitcoin Cash node (BCHN or Flowee) with ZMQ enabled
-- npm or yarn package manager
-
-### Backend Setup
-
-1. **Clone the repository**:
-```bash
-git clone https://github.com/yourusername/bch-creator-hub.git
-cd bch-creator-hub/backend
-```
-
-2. **Install dependencies**:
-```bash
-npm install
-```
-
-3. **Configure environment variables**:
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-```env
-# Server
-PORT=3001
-NODE_ENV=development
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/bch_creator_hub
-DB_POOL_MAX=20
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Blockchain
-BCH_NETWORK=testnet
-ZMQ_URL=tcp://127.0.0.1:28332
-BCHJS_REST_URL=https://rest.kingbch.com/v5/
-BCHJS_API_TOKEN=your_token_here
-
-# JWT
-JWT_SECRET=your_secret_key_here
-JWT_EXPIRES_IN=7d
-
-# CORS
-ALLOWED_ORIGINS=http://localhost:8080,http://localhost:3000
-
-# Service
-SERVICE_FEE_BASIS_POINTS=100
-SERVICE_PUBKEY=your_service_pubkey_here
-```
-
-4. **Initialize database**:
-```bash
-npm run db:migrate
-npm run db:seed
-```
-
-5. **Deploy smart contracts** (testnet):
-```bash
-npm run deploy:contracts
-```
-
-6. **Start the server**:
-```bash
-# Development
-npm run dev
-
-# Production
-npm start
-```
-
-### Frontend Setup
-
-1. **Navigate to project root**:
-```bash
-cd ..
-```
-
-2. **Install dependencies**:
-```bash
-npm install
-```
-
-3. **Configure environment**:
-Create `.env`:
-```env
-VITE_API_URL=http://localhost:3001
-VITE_WS_URL=ws://localhost:3001
-VITE_BCH_NETWORK=testnet
-```
-
-4. **Start development server**:
-```bash
-npm run dev
-```
-
-The frontend will be available at `http://localhost:8080`
-
-### Bitcoin Cash Node Configuration
-
-Configure your BCH node to enable ZMQ notifications:
-
-**bitcoin.conf** (BCHN):
-```conf
-zmqpubhashblock=tcp://127.0.0.1:28332
-zmqpubhashtx=tcp://127.0.0.1:28333
-zmqpubrawblock=tcp://127.0.0.1:28334
-zmqpubrawtx=tcp://127.0.0.1:28335
-```
-
-**bchd.conf** (BCHD):
-```conf
-zmqpubhashblock=tcp://127.0.0.1:28332
-zmqpubhashtx=tcp://127.0.0.1:28333
-```
-
----
-
 ## Deployment
 
 ### Docker Deployment
-
-**Backend Dockerfile**:
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-
-EXPOSE 3001
-
-CMD ["node", "src/server.js"]
-```
 
 **docker-compose.yml**:
 ```yaml
@@ -815,7 +935,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build: .
     ports:
       - "80:80"
     depends_on:
@@ -980,6 +1100,29 @@ bch-creator-hub/
 └── README.md              # This file
 ```
 
+### Technology Stack
+
+**Frontend**
+- React 18.3+ with TypeScript
+- Vite 5.4+ for build tooling
+- Tailwind CSS + shadcn/ui components
+- React Query for state management
+- WebSocket client for real-time updates
+
+**Backend**
+- Node.js 18+ with Express 4.18+
+- PostgreSQL 14+ for persistent storage
+- Redis 4.6+ for caching and sessions
+- CashScript 0.8+ for smart contracts
+- Zeromq for blockchain event streaming
+- Bull for job queue management
+
+**Blockchain**
+- Bitcoin Cash (BCH) Mainnet/Testnet
+- CashScript smart contracts
+- BCH-2023-02 CashTokens
+- BIP-322 message signing
+
 ### Running Tests
 
 **Backend**:
@@ -1002,16 +1145,137 @@ npm run test:watch
 - **TypeScript**: Type checking for frontend
 - **Husky**: Git hooks for pre-commit checks
 
-### Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Write tests for new functionality
-5. Ensure all tests pass: `npm test`
-6. Commit your changes: `git commit -m 'Add amazing feature'`
-7. Push to the branch: `git push origin feature/amazing-feature`
-8. Open a Pull Request
+## Use Cases
+
+### Content Creators
+
+- **Bloggers**: Accept tips and unlock premium articles
+- **YouTubers**: Receive donations and subscription payments
+- **Podcasters**: Monetize episodes with pay-per-listen
+- **Writers**: Sell individual articles or subscription access
+
+### Developers
+
+- **Open Source**: Accept donations and sponsor payments
+- **SaaS**: Subscription-based access to tools and services
+- **APIs**: Pay-per-use API access
+- **Courses**: Sell educational content and tutorials
+
+### Artists & Musicians
+
+- **Digital Art**: Sell NFT subscriptions and access to exclusive content
+- **Music**: Subscription-based access to music library
+- **Commissions**: Accept payments for custom work
+- **Merchandise**: Pre-orders and limited edition sales
+
+### Entrepreneurs
+
+- **Startups**: Accept early adopter payments
+- **Services**: Subscription-based services
+- **Consulting**: Payment for consulting hours
+- **Events**: Ticket sales and registration fees
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+#### Database Connection Errors
+
+**Problem**: Cannot connect to PostgreSQL
+
+**Solution**:
+- Verify PostgreSQL is running: `pg_isready`
+- Check `DATABASE_URL` in `.env` file
+- Ensure database exists: `createdb bch_creator_hub`
+- Check firewall settings
+
+#### Redis Connection Errors
+
+**Problem**: Cannot connect to Redis
+
+**Solution**:
+- Verify Redis is running: `redis-cli ping`
+- Check `REDIS_URL` in `.env` file
+- Ensure Redis is accessible on the configured port
+
+#### ZMQ Indexer Not Working
+
+**Problem**: Transactions not being indexed
+
+**Solution**:
+- Verify BCH node is running and synced
+- Check ZMQ URLs in configuration
+- Ensure ZMQ is enabled in `bitcoin.conf`
+- Check indexer logs for errors
+
+#### Smart Contract Deployment Fails
+
+**Problem**: Contract deployment errors
+
+**Solution**:
+- Verify you have BCH in the deployment wallet
+- Check network configuration (testnet/mainnet)
+- Ensure CashScript compiler is installed
+- Check contract syntax for errors
+
+#### Frontend Cannot Connect to Backend
+
+**Problem**: API calls failing
+
+**Solution**:
+- Verify backend is running on configured port
+- Check `VITE_API_URL` in frontend `.env`
+- Verify CORS settings in backend
+- Check browser console for specific errors
+
+#### Authentication Issues
+
+**Problem**: Cannot login with wallet
+
+**Solution**:
+- Ensure wallet supports BIP-322 signing
+- Verify message format matches expected format
+- Check JWT_SECRET is set correctly
+- Clear browser cache and try again
+
+### Getting Help
+
+- **GitHub Issues**: Open an issue for bugs or feature requests
+- **Documentation**: Check the `/docs` directory for detailed documentation
+- **Community**: Join our Discord server for support
+- **Email**: Contact the development team for enterprise support
+
+---
+
+## Contributing
+
+We welcome contributions! Here's how you can help:
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes**
+4. **Write tests** for new functionality
+5. **Ensure all tests pass**: `npm test`
+6. **Commit your changes**: `git commit -m 'Add amazing feature'`
+7. **Push to the branch**: `git push origin feature/amazing-feature`
+8. **Open a Pull Request**
+
+### Contribution Guidelines
+
+- Follow the existing code style
+- Write tests for new features
+- Update documentation as needed
+- Ensure all tests pass before submitting
+- Write clear commit messages
+- Reference issues in pull requests
+
+### Development Setup
+
+See the [Installation & Setup](#installation--setup) section for detailed setup instructions.
 
 ---
 
@@ -1042,5 +1306,7 @@ For questions, issues, or contributions, please open an issue on GitHub or conta
 <div align="center">
 
 **Built with ❤️ for the Bitcoin Cash ecosystem**
+
+[⬆ Back to Top](#bch-creator-hub)
 
 </div>
