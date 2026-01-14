@@ -16,8 +16,9 @@ export const truncateAddress = (address: string, chars = 8): string => {
   return `${address.slice(0, chars)}...${address.slice(-chars)}`;
 };
 
-export const formatDate = (date: string | Date): string => {
-  return new Date(date).toLocaleDateString('en-US', {
+export const formatDate = (date: string | Date | number): string => {
+  const d = typeof date === 'number' ? new Date(date) : new Date(date);
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -32,3 +33,34 @@ export const formatNumber = (num: number): string => {
 
 export const satsToBCH = (sats: number): number => sats / 100000000;
 export const bchToSats = (bch: number): number => Math.round(bch * 100000000);
+
+// BCH address validation (basic)
+export const validateBCHAddress = (address: string): boolean => {
+  if (!address) return false;
+  // Basic validation - checks for bitcoincash: prefix or legacy format
+  const cashaddrRegex = /^(bitcoincash:)?([qpzry9x8gf2tvdw0s3jn54khce6mua7l]{42}|[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{62})$/i;
+  const legacyRegex = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+  return cashaddrRegex.test(address) || legacyRegex.test(address);
+};
+
+// Calculate network fee (estimate)
+export const calculateFee = (satoshis: number, feeRate: number = 0.01): number => {
+  // Simple fee calculation: base fee + percentage of amount
+  const baseFee = 1000; // 0.00001 BCH in sats
+  const percentageFee = Math.round(satoshis * feeRate);
+  return baseFee + percentageFee;
+};
+
+// Format transaction type
+export const formatTransactionType = (type?: number | string): string => {
+  if (typeof type === 'string') return type;
+  const types: Record<number, string> = {
+    0: 'Payment',
+    1: 'Tip',
+    2: 'Subscription',
+    3: 'Purchase',
+    4: 'Donation',
+    5: 'Incoming',
+  };
+  return types[type || 0] || 'Transaction';
+};

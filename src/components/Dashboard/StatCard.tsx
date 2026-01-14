@@ -1,43 +1,54 @@
-import { motion } from 'framer-motion';
-import { ReactNode } from 'react';
+import React from 'react';
+import clsx from 'clsx';
 
-interface StatCardProps {
+type Props = {
   title: string;
-  value: string;
-  icon: ReactNode;
+  value: string | number;
+  subValue?: string;
+  icon?: React.ReactNode;
   trend?: string | null;
   color?: 'primary' | 'green' | 'blue' | 'purple' | 'orange' | 'red';
-}
-
-const colorClasses = {
-  primary: 'from-primary/20 to-primary/5 text-primary',
-  green: 'from-emerald-500/20 to-emerald-500/5 text-emerald-400',
-  blue: 'from-blue-500/20 to-blue-500/5 text-blue-400',
-  purple: 'from-secondary/20 to-secondary/5 text-secondary',
-  orange: 'from-orange-500/20 to-orange-500/5 text-orange-400',
-  red: 'from-red-500/20 to-red-500/5 text-red-400',
 };
 
-const StatCard = ({ title, value, icon, trend, color = 'primary' }: StatCardProps) => {
+const colorMap: Record<string, string> = {
+  primary: 'from-primary to-secondary',
+  green: 'bg-green-600/10 text-green-300',
+  blue: 'bg-blue-600/10 text-blue-300',
+  purple: 'bg-purple-600/10 text-purple-300',
+  orange: 'bg-yellow-600/10 text-yellow-300',
+  red: 'bg-red-600/10 text-red-300',
+};
+
+const StatCard: React.FC<Props> = ({ title, value, subValue, icon, trend, color = 'primary' }) => {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`glass-card rounded-xl p-5 bg-gradient-to-br ${colorClasses[color]}`}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="p-2 rounded-lg bg-background/50">
-          {icon}
-        </div>
-        {trend && (
-          <span className="text-xs px-2 py-1 rounded-full bg-background/50 text-muted-foreground">
-            {trend}
-          </span>
+    <div className="glass-card rounded-xl p-5 flex items-center gap-4">
+      <div 
+        className={clsx(
+          'w-14 h-14 rounded-xl flex items-center justify-center', 
+          color === 'primary' ? 'bg-gradient-to-br' : ''
+        )}
+      >
+        {color === 'primary' ? (
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground">
+            {icon}
+          </div>
+        ) : (
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[color] || ''}`}>
+            {icon}
+          </div>
         )}
       </div>
-      <p className="text-2xl font-bold text-foreground mb-1">{value}</p>
-      <p className="text-sm text-muted-foreground">{title}</p>
-    </motion.div>
+
+      <div className="flex-1">
+        <div className="text-sm text-muted-foreground">{title}</div>
+        <div className="flex items-baseline gap-2">
+          <div className="text-xl font-bold text-foreground">{value}</div>
+          {subValue && <div className="text-sm text-muted-foreground">{subValue}</div>}
+        </div>
+      </div>
+
+      {trend && <div className="text-sm text-muted-foreground">{trend}</div>}
+    </div>
   );
 };
 

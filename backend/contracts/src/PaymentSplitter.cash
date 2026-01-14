@@ -1,0 +1,283 @@
+pragma cashscript ^0.9.0;
+
+/**
+ * @title PaymentSplitter
+ * @notice Split payments among multiple recipients
+ * @dev Automatically distributes payments according to predefined shares
+ * Features:
+ * - Multiple recipient support
+ * - Proportional splitting
+ * - Minimum payment thresholds
+ * - Emergency redistribution
+ */
+contract PaymentSplitter {
+    // Constants
+    int constant DUST_LIMIT = 546;
+    int constant SHARE_DENOMINATOR = 10000; // 10000 = 100%
+    
+    // Contract state
+    struct Recipient {
+        bytes20 pubKeyHash;    // P2PKH hash
+        int share;            // Share in basis points (100 = 1%)
+        int minPayment;       // Minimum payment before distribution
+        int totalReceived;    // Tracking total received (off-chain)
+    }
+    
+    Recipient[] recipients;
+    pubkey managerPubKey;     // Manager can update recipients
+    int totalShares;          // Sum of all shares
+    
+    /**
+     * @notice Constructor
+     * @param _recipients Initial recipients array
+     * @param _managerPubKey Manager's public key
+     */
+    constructor(
+        Recipient[] _recipients,
+        pubkey _managerPubKey
+    ) {
+        require(_recipients.length > 0 && _recipients.length <= 10,
+            "1-10 recipients allowed");
+        
+        int sharesSum = 0;
+        for (int i = 0; i < _recipients.length; i++) {
+            require(_recipients[i].share > 0, "Share must be positive");
+            require(_recipients[i].minPayment >= 0, "Min payment cannot be negative");
+            sharesSum += _recipients[i].share;
+            recipients.push(_recipients[i]);
+        }
+        
+        require(sharesSum == SHARE_DENOMINATOR, "Shares must sum to 10000");
+        
+        managerPubKey = _managerPubKey;
+        totalShares = sharesSum;
+    }
+    
+    /**
+     * @notice Distribute funds according to shares
+     * @dev Automatically splits incoming funds
+     * @param data OP_RETURN data (ignored)
+     */
+    function distribute(bytes data) {
+        // Anyone can trigger distribution
+        int totalAmount = tx.value;
+        require(totalAmount >= DUST_LIMIT, "Amount below dust limit");
+        
+        // Calculate and verify outputs
+        int outputIndex = 0;
+        int distributedAmount = 0;
+        
+        for (int i = 0; i < recipients.length; i++) {
+            Recipient memory recipient = recipients[i];
+            int shareAmount = totalAmount * recipient.share / SHARE_DENOMINATOR;
+            
+            // Apply minimum payment threshold
+            if (shareAmount < recipient.minPayment) {
+                // Hold until threshold met (accumulate in contract)
+                // For now, still distribute minimum
+                shareAmount = recipient.minPayment;
+            }
+            
+            if (shareAmount > 0) {
+                require(outputIndex < tx.outputs.length, "Insufficient outputs");
+                require(tx.outputs[outputIndex].value >= shareAmount,
+                    "Insufficient amount for recipient");
+                require(extractPubKeyHash(tx.outputs[outputIndex].lockingScript) == recipient.pubKeyHash,
+                    "Output doesn't match recipient");
+                
+                distributedAmount += shareAmount;
+                outputIndex++;
+            }
+        }
+        
+        // Handle remaining amount (change or service fee)
+        if (distributedAmount < totalAmount) {
+            if (outputIndex < tx.outputs.length) {
+                // Change back to contract
+                require(tx.outputs[outputIndex].lockingScript == 
+                    tx.inputs[this.activeInputIndex].lockingScript,
+                    "Invalid change output");
+            }
+        }
+    }
+    
+    /**
+     * @notice Update recipient shares
+     * @dev Can only be called by manager
+     * @param managerSig Manager's signature
+     * @param recipientIndex Index of recipient to update
+     * @param newShare New share in basis points
+     * @param newMinPayment New minimum payment in satoshis
+     */
+    function updateRecipient(
+        sig managerSig,
+        int recipientIndex,
+        int newShare,
+        int newMinPayment
+    ) {
+        require(checkSig(managerSig, this.managerPubKey));
+        require(recipientIndex >= 0 && recipientIndex < recipients.length,
+            "Invalid recipient index");
+        require(newShare > 0, "Share must be positive");
+        require(newMinPayment >= 0, "Min payment cannot be negative");
+        
+        // Update recipient
+        recipients[recipientIndex].share = newShare;
+        recipients[recipientIndex].minPayment = newMinPayment;
+        
+        // Recalculate total shares
+        totalShares = 0;
+        for (int i = 0; i < recipients.length; i++) {
+            totalShares += recipients[i].share;
+        }
+        
+        require(totalShares == SHARE_DENOMINATOR, "Shares must sum to 10000");
+    }
+    
+    /**
+     * @notice Add new recipient
+     * @dev Can only be called by manager
+     * @param managerSig Manager's signature
+     * @param newRecipient New recipient data
+     */
+    function addRecipient(
+        sig managerSig,
+        Recipient newRecipient
+    ) {
+        require(checkSig(managerSig, this.managerPubKey));
+        require(recipients.length < 10, "Maximum 10 recipients");
+        require(newRecipient.share > 0, "Share must be positive");
+        require(newRecipient.minPayment >= 0, "Min payment cannot be negative");
+        
+        // Add new recipient
+        recipients.push(newRecipient);
+        
+        // Update total shares
+        totalShares += newRecipient.share;
+        
+        // This would require redeploying contract with new configuration
+    }
+    
+    /**
+     * @notice Remove recipient
+     * @dev Can only be called by manager
+     * @param managerSig Manager's signature
+     * @param recipientIndex Index of recipient to remove
+     */
+    function removeRecipient(
+        sig managerSig,
+        int recipientIndex
+    ) {
+        require(checkSig(managerSig, this.managerPubKey));
+        require(recipientIndex >= 0 && recipientIndex < recipients.length,
+            "Invalid recipient index");
+        
+        // Remove recipient and redistribute shares
+        int removedShare = recipients[recipientIndex].share;
+        
+        // Remove from array (in CashScript, we'd need new contract)
+        // For now, just set share to 0
+        recipients[recipientIndex].share = 0;
+        
+        // Update total shares
+        totalShares -= removedShare;
+        
+        // This would require redeploying contract with new configuration
+    }
+    
+    /**
+     * @notice Emergency redistribution
+     * @dev Manager can redistribute if automatic distribution fails
+     * @param managerSig Manager's signature
+     * @param amounts Array of amounts for each recipient
+     */
+    function emergencyRedistribute(
+        sig managerSig,
+        int[] amounts
+    ) {
+        require(checkSig(managerSig, this.managerPubKey));
+        require(amounts.length == recipients.length,
+            "Amounts array length mismatch");
+        
+        int totalAmount = tx.value;
+        int distributedAmount = 0;
+        int outputIndex = 0;
+        
+        for (int i = 0; i < recipients.length; i++) {
+            int amount = amounts[i];
+            
+            if (amount > 0) {
+                require(outputIndex < tx.outputs.length, "Insufficient outputs");
+                require(tx.outputs[outputIndex].value >= amount,
+                    "Insufficient amount for recipient");
+                require(extractPubKeyHash(tx.outputs[outputIndex].lockingScript) == 
+                    recipients[i].pubKeyHash,
+                    "Output doesn't match recipient");
+                
+                distributedAmount += amount;
+                outputIndex++;
+            }
+        }
+        
+        require(distributedAmount <= totalAmount, "Distributed more than available");
+        
+        // Handle change
+        if (distributedAmount < totalAmount) {
+            if (outputIndex < tx.outputs.length) {
+                require(tx.outputs[outputIndex].lockingScript == 
+                    tx.inputs[this.activeInputIndex].lockingScript,
+                    "Invalid change output");
+            }
+        }
+    }
+    
+    /**
+     * @notice Get contract information
+     * @return info Encoded contract parameters
+     */
+    function getInfo() returns (bytes) {
+        bytes memory data = new bytes(2 + (recipients.length * 26));
+        
+        // Number of recipients (1 byte)
+        data[0] = byte(recipients.length);
+        
+        // Total shares (2 bytes, big-endian)
+        data[1] = byte(totalShares >> 8);
+        data[2] = byte(totalShares & 0xFF);
+        
+        // Recipient data (26 bytes each)
+        for (int i = 0; i < recipients.length; i++) {
+            int offset = 3 + (i * 26);
+            
+            // PubKeyHash (20 bytes)
+            for (int j = 0; j < 20; j++) {
+                data[offset + j] = recipients[i].pubKeyHash[j];
+            }
+            
+            // Share (2 bytes, big-endian)
+            data[offset + 20] = byte(recipients[i].share >> 8);
+            data[offset + 21] = byte(recipients[i].share & 0xFF);
+            
+            // Min payment (4 bytes, big-endian)
+            for (int j = 3; j >= 0; j--) {
+                data[offset + 22 + j] = byte(recipients[i].minPayment & 0xFF);
+                recipients[i].minPayment = recipients[i].minPayment >> 8;
+            }
+        }
+        
+        return data;
+    }
+    
+    function extractPubKeyHash(bytes script) returns (bytes20) {
+        // Same implementation as CreatorRouter
+        require(script.length == 25, "Invalid P2PKH script length");
+        require(script[0] == 0x76, "Invalid OP_DUP");
+        require(script[1] == 0xa9, "Invalid OP_HASH160");
+        require(script[2] == 0x14, "Invalid push data");
+        require(script[23] == 0x88, "Invalid OP_EQUALVERIFY");
+        require(script[24] == 0xac, "Invalid OP_CHECKSIG");
+        
+        return script[3:23];
+    }
+}
+

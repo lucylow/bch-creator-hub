@@ -1,0 +1,297 @@
+pragma cashscript ^0.9.0;
+
+/**
+ * @title MultiSigVault
+ * @notice Multi-signature vault for creator teams
+ * @dev Requires M-of-N signatures for withdrawals
+ * Features:
+ * - M-of-N multisig
+ * - Time-delayed emergency withdrawal
+ * - Flexible threshold configuration
+ */
+contract MultiSigVault {
+    // Constants
+    int constant DUST_LIMIT = 546;
+    
+    // Contract state
+    pubkey[] signers;          // Array of signer public keys
+    int threshold;             // Required number of signatures (M)
+    int emergencyDelay;        // Delay for emergency withdrawal in seconds
+    
+    // Track last withdrawal
+    int lastWithdrawalTime;
+    
+    /**
+     * @notice Constructor
+     * @param _signers Array of signer public keys
+     * @param _threshold Required signatures (M)
+     * @param _emergencyDelay Emergency withdrawal delay in seconds
+     */
+    constructor(
+        pubkey[] _signers,
+        int _threshold,
+        int _emergencyDelay
+    ) {
+        require(_signers.length > 0 && _signers.length <= 10, "1-10 signers allowed");
+        require(_threshold > 0 && _threshold <= _signers.length, 
+            "Threshold must be 1-M where M = signers count");
+        require(_emergencyDelay >= 86400 && _emergencyDelay <= 2592000,
+            "Emergency delay: 1-30 days");
+        
+        signers = _signers;
+        threshold = _threshold;
+        emergencyDelay = _emergencyDelay;
+        lastWithdrawalTime = 0;
+    }
+    
+    /**
+     * @notice Standard withdrawal with multiple signatures
+     * @dev Requires M signatures from the signer set
+     * @param sigs Array of signatures
+     * @param pubkeys Array of corresponding public keys
+     * @param to Recipient address (P2PKH hash)
+     * @param amount Amount to withdraw in satoshis
+     */
+    function withdraw(
+        sig[] sigs,
+        pubkey[] pubkeys,
+        bytes20 to,
+        int amount
+    ) {
+        require(sigs.length == pubkeys.length, "Signature/pubkey count mismatch");
+        require(sigs.length >= threshold, "Insufficient signatures");
+        
+        // Verify all signatures
+        bytes32 sighash = tx.hash;
+        int validSigs = 0;
+        
+        for (int i = 0; i < sigs.length; i++) {
+            // Check if pubkey is in signer list
+            bool isSigner = false;
+            for (int j = 0; j < signers.length; j++) {
+                if (pubkeys[i] == signers[j]) {
+                    isSigner = true;
+                    break;
+                }
+            }
+            
+            require(isSigner, "Pubkey not authorized");
+            
+            // Verify signature
+            if (checkSig(sigs[i], pubkeys[i])) {
+                validSigs++;
+            }
+        }
+        
+        require(validSigs >= threshold, "Not enough valid signatures");
+        
+        // Verify withdrawal amount
+        require(amount >= DUST_LIMIT && amount <= tx.value, "Invalid amount");
+        
+        // Verify outputs
+        if (amount == tx.value) {
+            // Full withdrawal
+            require(tx.outputs.length == 1, "Expected 1 output");
+            require(tx.outputs[0].value >= amount, "Insufficient amount");
+            require(extractPubKeyHash(tx.outputs[0].lockingScript) == to,
+                "Output doesn't match recipient");
+        } else {
+            // Partial withdrawal with change
+            require(tx.outputs.length == 2, "Expected 2 outputs");
+            require(tx.outputs[0].value >= amount, "Insufficient amount");
+            require(extractPubKeyHash(tx.outputs[0].lockingScript) == to,
+                "Output doesn't match recipient");
+            require(tx.outputs[1].lockingScript == tx.inputs[this.activeInputIndex].lockingScript,
+                "Invalid change output");
+        }
+        
+        // Update last withdrawal time
+        lastWithdrawalTime = tx.time;
+    }
+    
+    /**
+     * @notice Emergency withdrawal with single signature after delay
+     * @dev Any signer can withdraw after emergencyDelay of inactivity
+     * @param sig Signer's signature
+     * @param signerPubKey Signer's public key
+     */
+    function emergencyWithdraw(sig sig, pubkey signerPubKey) {
+        // Verify signer is authorized
+        bool isSigner = false;
+        for (int i = 0; i < signers.length; i++) {
+            if (signerPubKey == signers[i]) {
+                isSigner = true;
+                break;
+            }
+        }
+        require(isSigner, "Not a signer");
+        
+        // Verify signature
+        require(checkSig(sig, signerPubKey));
+        
+        // Check emergency delay
+        require(tx.time >= lastWithdrawalTime + emergencyDelay,
+            "Emergency withdrawal not available yet");
+        
+        // Full withdrawal only in emergency
+        require(tx.outputs.length == 1, "Expected 1 output");
+        require(tx.outputs[0].value >= tx.value, "Insufficient amount");
+        
+        // Must go to the emergency withdrawer
+        require(hash160(signerPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript),
+            "Output must go to emergency withdrawer");
+    }
+    
+    /**
+     * @notice Add a new signer (requires all current signers)
+     * @dev Updates the signer list with unanimous consent
+     * @param sigs Signatures from all current signers
+     * @param pubkeys Public keys of all current signers
+     * @param newSigner New signer to add
+     */
+    function addSigner(
+        sig[] sigs,
+        pubkey[] pubkeys,
+        pubkey newSigner
+    ) {
+        require(signers.length < 10, "Maximum 10 signers");
+        require(sigs.length == signers.length, "Need all current signers");
+        require(pubkeys.length == signers.length, "Need all current pubkeys");
+        
+        // Verify all current signers agree
+        for (int i = 0; i < signers.length; i++) {
+            bool found = false;
+            for (int j = 0; j < pubkeys.length; j++) {
+                if (signers[i] == pubkeys[j]) {
+                    require(checkSig(sigs[j], pubkeys[j]), "Invalid signature");
+                    found = true;
+                    break;
+                }
+            }
+            require(found, "Missing signer");
+        }
+        
+        // Add new signer
+        signers.push(newSigner);
+        
+        // New contract must be deployed - this function serves as proof of agreement
+    }
+    
+    /**
+     * @notice Remove a signer (requires all other signers)
+     * @dev Removes a signer with consent of all remaining signers
+     * @param sigs Signatures from all other signers
+     * @param pubkeys Public keys of all other signers
+     * @param signerToRemove Signer to remove
+     */
+    function removeSigner(
+        sig[] sigs,
+        pubkey[] pubkeys,
+        pubkey signerToRemove
+    ) {
+        require(signers.length > threshold, "Cannot go below threshold");
+        require(sigs.length == signers.length - 1, "Need all other signers");
+        require(pubkeys.length == signers.length - 1, "Need all other pubkeys");
+        
+        // Find and verify the signer to remove exists
+        bool exists = false;
+        int removeIndex = -1;
+        for (int i = 0; i < signers.length; i++) {
+            if (signers[i] == signerToRemove) {
+                exists = true;
+                removeIndex = i;
+                break;
+            }
+        }
+        require(exists, "Signer not found");
+        
+        // Verify all other signers agree
+        for (int i = 0; i < signers.length; i++) {
+            if (i == removeIndex) continue;
+            
+            bool found = false;
+            for (int j = 0; j < pubkeys.length; j++) {
+                if (signers[i] == pubkeys[j]) {
+                    require(checkSig(sigs[j], pubkeys[j]), "Invalid signature");
+                    found = true;
+                    break;
+                }
+            }
+            require(found, "Missing signer");
+        }
+        
+        // Remove the signer
+        // In CashScript, we would need to create a new contract
+    }
+    
+    /**
+     * @notice Update threshold (requires all signers)
+     * @dev Changes the required number of signatures
+     * @param sigs Signatures from all signers
+     * @param pubkeys Public keys of all signers
+     * @param newThreshold New threshold value
+     */
+    function updateThreshold(
+        sig[] sigs,
+        pubkey[] pubkeys,
+        int newThreshold
+    ) {
+        require(newThreshold > 0 && newThreshold <= signers.length,
+            "Threshold must be 1-M where M = signers count");
+        
+        require(sigs.length == signers.length, "Need all signers");
+        require(pubkeys.length == signers.length, "Need all pubkeys");
+        
+        // Verify all signers agree
+        for (int i = 0; i < signers.length; i++) {
+            bool found = false;
+            for (int j = 0; j < pubkeys.length; j++) {
+                if (signers[i] == pubkeys[j]) {
+                    require(checkSig(sigs[j], pubkeys[j]), "Invalid signature");
+                    found = true;
+                    break;
+                }
+            }
+            require(found, "Missing signer");
+        }
+        
+        threshold = newThreshold;
+    }
+    
+    /**
+     * @notice Get contract information
+     * @return info Encoded contract parameters
+     */
+    function getInfo() returns (bytes) {
+        bytes memory data = new bytes(2 + (signers.length * 33));
+        
+        // Threshold (1 byte)
+        data[0] = byte(threshold);
+        
+        // Number of signers (1 byte)
+        data[1] = byte(signers.length);
+        
+        // Signer public keys (33 bytes each)
+        for (int i = 0; i < signers.length; i++) {
+            bytes memory pubKeyBytes = signers[i];
+            for (int j = 0; j < 33; j++) {
+                data[2 + (i * 33) + j] = pubKeyBytes[j];
+            }
+        }
+        
+        return data;
+    }
+    
+    function extractPubKeyHash(bytes script) returns (bytes20) {
+        // Same implementation as CreatorRouter
+        require(script.length == 25, "Invalid P2PKH script length");
+        require(script[0] == 0x76, "Invalid OP_DUP");
+        require(script[1] == 0xa9, "Invalid OP_HASH160");
+        require(script[2] == 0x14, "Invalid push data");
+        require(script[23] == 0x88, "Invalid OP_EQUALVERIFY");
+        require(script[24] == 0xac, "Invalid OP_CHECKSIG");
+        
+        return script[3:23];
+    }
+}
+

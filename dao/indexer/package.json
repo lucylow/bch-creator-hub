@@ -1,0 +1,13 @@
+{
+  "name": "dao-indexer",
+  "version": "1.0.0",
+  "description": "Indexer for DAO proposals",
+  "main": "indexer.js",
+  "scripts": {
+    "start": "node indexer.js"
+  },
+  "dependencies": {
+    "ethers": "^5.7.2"
+  }
+}
+

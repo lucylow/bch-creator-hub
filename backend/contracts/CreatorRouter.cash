@@ -1,0 +1,61 @@
+pragma cashscript ^0.10.0;
+
+// CreatorRouter
+// - minimal on-chain logic: authorizes withdraws by creator signature
+// - enforces outputs: payout (required) and optional service fee output (if hasService=true)
+// Constructor args:
+//   bytes20 payoutPkh         -> P2PKH pubkey-hash for creator payout
+//   bytes20 servicePkh        -> P2PKH pubkey-hash for service (if hasService=true)
+//   pubkey   creatorPubKey    -> public key that must sign withdraws
+//   int      feeBasisPoints   -> fee in basis points (100 == 1.00%)
+//   bool     hasService       -> whether the service output must be present
+contract CreatorRouter(
+  bytes20 payoutPkh,
+  bytes20 servicePkh,
+  pubkey creatorPubKey,
+  int feeBasisPoints,
+  bool hasService
+) {
+
+  // withdraw() - creator signs to authorize a spending transaction
+  // The calling transaction must:
+  //  - spend the contract UTXO as the active input (default in SDK)
+  //  - include an output[0] that pays the creator payout P2PKH with at least (inputValue - serviceSats - minerAllowance)
+  //  - if hasService == true: include output[1] that pays servicePkh with at least serviceSats
+  // Notes:
+  //  - We allow a miner allowance (1000 sats default) so wallet/builders do not have to compute exact fee
+  //  - Use conservative math for integer division
+  function withdraw(sig creatorSig) {
+    // 1) verify signature from creator
+    require(checkSig(creatorSig, creatorPubKey));
+
+    // 2) basic input / output sanity
+    require(tx.inputs.length >= 1);
+    require(tx.outputs.length >= 1);
+
+    // 3) compute current contract value (value of the input being spent)
+    int currentValue = tx.inputs[this.activeInputIndex].value;
+
+    // 4) compute serviceSats = floor(currentValue * feeBasisPoints / 10000)
+    int serviceSats = (currentValue * feeBasisPoints) / 10000;
+
+    // 5) build expected locking bytecodes for payout and service
+    bytes payoutLocking = new LockingBytecodeP2PKH(payoutPkh);
+
+    // ensure first output pays creator and at least expected payout (allow miner allowance)
+    int minerAllowance = 1000; // sats allowed to cover miner fees / change handling (tune per your UX)
+    int expectedPayoutMin = currentValue - serviceSats - minerAllowance;
+
+    // Basic checks for payout output
+    require(tx.outputs[0].lockingBytecode == payoutLocking);
+    require(tx.outputs[0].value >= expectedPayoutMin);
+
+    // If service is configured then check second output matches and receives at least serviceSats
+    if (hasService) {
+      bytes serviceLocking = new LockingBytecodeP2PKH(servicePkh);
+      require(tx.outputs.length >= 2);
+      require(tx.outputs[1].lockingBytecode == serviceLocking);
+      require(tx.outputs[1].value >= serviceSats);
+    }
+  }
+}

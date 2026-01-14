@@ -1,44 +1,97 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, CheckCircle, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { User, CheckCircle, Copy, ExternalLink, Globe, Calendar, Zap } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { formatBCH, truncateAddress, bchToSats } from '@/utils/formatters';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
+import PaymentForm from '@/components/Payment/PaymentForm';
+import WalletConnectModal from '@/components/Wallet/WalletConnectModal';
+import { useWallet } from '@/contexts/WalletContext';
 
 const PaymentPage = () => {
-  const { creatorId } = useParams();
+  const { creatorId, paymentId } = useParams<{ creatorId?: string; paymentId?: string }>();
   const navigate = useNavigate();
+  const { isConnected, address, sendPayment } = useWallet();
   
   const [isLoading, setIsLoading] = useState(true);
-  const [amount, setAmount] = useState('0.01');
+  const [amount, setAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [txHash, setTxHash] = useState('');
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState({
+    recipient: '',
+    amountSats: 0,
+    description: '',
+    contentUrl: '',
+    createdAt: new Date().toISOString(),
+  });
 
   const creatorInfo = {
     displayName: 'Demo Creator',
     bio: 'Building the future of creator monetization',
     address: 'bitcoincash:qpaq9sh8w7xs5qn4q9c3l8f9k2d4q7s8vga9mpt2vh',
+    contractAddress: 'bitcoincash:qpaq9sh8w7xs5qn4q9c3l8f9k2d4q7s8vga9mpt2vh',
   };
 
+  const loadDetails = useCallback(async () => {
+    setIsLoading(true);
+    // Mock loading - replace with actual API call
+    setTimeout(() => {
+      setPaymentDetails({
+        recipient: creatorInfo.address,
+        amountSats: 0, // 0 means flexible amount
+        description: paymentId ? `Payment ${paymentId}` : 'Support this creator',
+        contentUrl: '',
+        createdAt: new Date().toISOString(),
+      });
+      setIsLoading(false);
+    }, 500);
+  }, [paymentId]);
+
   useEffect(() => {
-    setTimeout(() => setIsLoading(false), 500);
-  }, []);
+    if (creatorId) {
+      loadDetails();
+    }
+  }, [creatorId, loadDetails]);
 
   const handlePayment = async () => {
-    setIsProcessing(true);
-    
-    // Simulate payment
-    setTimeout(() => {
-      setTxHash('abc123def456789...');
-      setPaymentComplete(true);
+    if (!isConnected) {
+      setShowWalletModal(true);
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      
+      const amountSats = paymentDetails.amountSats || Math.round(parseFloat(amount) * 100000000);
+      
+      const result = await sendPayment(
+        creatorInfo.contractAddress,
+        amountSats,
+        JSON.stringify({
+          creatorId,
+          paymentType: 'tip',
+          metadata: {}
+        })
+      );
+
+      if (result?.txid) {
+        setTxHash(result.txid);
+        setPaymentComplete(true);
+        toast.success('Payment sent successfully!');
+      } else {
+        throw new Error('Payment may not have completed');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Payment failed';
+      toast.error(errorMessage);
+    } finally {
       setIsProcessing(false);
-      toast.success('Payment sent successfully!');
-    }, 2000);
+    }
   };
 
   const copyAddress = () => {
@@ -129,21 +182,50 @@ const PaymentPage = () => {
             </div>
 
             <div className="space-y-4 mb-6">
-              <div className="flex justify-between p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Creator</span>
+              <div className="flex justify-between items-center p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-3">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Creator</p>
+                    <p className="font-medium text-foreground">{creatorInfo.displayName}</p>
+                  </div>
                 </div>
-                <span>{creatorInfo.displayName}</span>
-              </div>
-
-              <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                <span className="text-muted-foreground font-mono text-sm truncate flex-1 mr-2">
-                  {truncateAddress(creatorInfo.address, 12)}
-                </span>
                 <Button variant="ghost" size="sm" onClick={copyAddress}>
                   <Copy className="w-4 h-4" />
                 </Button>
+              </div>
+
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-3 mb-2">
+                  <Zap className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment For</p>
+                    <p className="font-medium text-foreground">{paymentDetails.description}</p>
+                  </div>
+                </div>
+                {paymentDetails.contentUrl && (
+                  <a 
+                    href={paymentDetails.contentUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="inline-flex items-center gap-2 text-primary hover:text-primary/80 text-sm"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>View Content</span>
+                  </a>
+                )}
+              </div>
+
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Created</p>
+                    <p className="font-medium text-foreground">
+                      {new Date(paymentDetails.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -163,56 +245,22 @@ const PaymentPage = () => {
           {/* Payment Form */}
           <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Send Payment</h2>
+              <h2 className="text-xl font-semibold">Complete Payment</h2>
               <span className="text-2xl">₿</span>
             </div>
 
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">Amount (BCH)</label>
-                <Input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  step="0.001"
-                  min="0.00001"
-                  className="text-2xl font-bold h-14 bg-muted/50"
-                />
-              </div>
+            <PaymentForm
+              amount={amount}
+              setAmount={setAmount}
+              fixedAmount={paymentDetails.amountSats > 0}
+              paymentDetails={paymentDetails}
+              isConnected={isConnected}
+              address={address}
+              isProcessing={isProcessing}
+              onPayment={handlePayment}
+              onConnectWallet={() => setShowWalletModal(true)}
+            />
 
-              <div className="flex gap-2">
-                {['0.001', '0.01', '0.05', '0.1'].map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => setAmount(preset)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      amount === preset
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {preset} BCH
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              onClick={handlePayment}
-              disabled={isProcessing || !amount}
-              className="w-full h-14 text-lg bg-gradient-primary hover:opacity-90 text-primary-foreground"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                `Pay ${amount} BCH`
-              )}
-            </Button>
-
-            {/* Fee Info */}
             <div className="mt-6 p-4 rounded-lg bg-muted/30 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Network Fee:</span>
@@ -224,16 +272,25 @@ const PaymentPage = () => {
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Total:</span>
-                <span className="text-primary">{amount} BCH</span>
+                <span className="text-primary">
+                  {formatBCH(paymentDetails.amountSats || Math.round((parseFloat(amount || '0') || 0) * 100000000))}
+                </span>
               </div>
             </div>
 
             <p className="text-xs text-muted-foreground text-center mt-4">
-              🔒 Secure Payment: Funds go directly to the creator's smart contract.
+              🔒 Secure Payment: Funds go directly to the creator's smart contract. We never hold your BCH.
             </p>
           </div>
         </motion.div>
       </div>
+
+      {showWalletModal && (
+        <WalletConnectModal 
+          open={showWalletModal} 
+          onClose={() => setShowWalletModal(false)} 
+        />
+      )}
     </div>
   );
 };

@@ -1,0 +1,288 @@
+pragma cashscript ^0.9.0;
+
+/**
+ * @title CreatorRouter
+ * @notice Main contract for BCH Paywall Router
+ * @dev Handles payment aggregation and withdrawals with optional service fee
+ * Features:
+ * - Non-custodial: Funds always controlled by creator
+ * - Minimal fees: 1% maximum service fee
+ * - Multi-output withdrawals
+ * - Time-locked subscriptions
+ * - Emergency withdrawal after timeout
+ */
+contract CreatorRouter {
+    // Constants
+    int constant DUST_LIMIT = 546;     // Minimum BCH output
+    int constant FEE_DENOMINATOR = 10000; // 10000 = 100%
+    
+    // Contract state
+    pubkey creatorPubKey;     // Creator's public key
+    pubkey servicePubKey;     // Optional service public key (for fees)
+    int feeBasisPoints;       // Fee in basis points (100 = 1%)
+    int minWithdrawalTime;    // Minimum seconds between withdrawals (anti-spam)
+    int lastWithdrawalTime;   // Timestamp of last withdrawal
+    
+    /**
+     * @notice Constructor
+     * @param _creatorPubKey Creator's public key
+     * @param _servicePubKey Service public key (optional, can be 0x00)
+     * @param _feeBasisPoints Fee percentage in basis points (100 = 1%)
+     * @param _minWithdrawalTime Minimum seconds between withdrawals
+     */
+    constructor(
+        pubkey _creatorPubKey,
+        pubkey _servicePubKey,
+        int _feeBasisPoints,
+        int _minWithdrawalTime
+    ) {
+        require(_feeBasisPoints >= 0 && _feeBasisPoints <= 200, "Fee must be 0-2%");
+        require(_minWithdrawalTime >= 0 && _minWithdrawalTime <= 604800, "Withdrawal time 0-7 days");
+        
+        creatorPubKey = _creatorPubKey;
+        servicePubKey = _servicePubKey;
+        feeBasisPoints = _feeBasisPoints;
+        minWithdrawalTime = _minWithdrawalTime;
+        lastWithdrawalTime = 0;
+    }
+    
+    /**
+     * @notice Standard withdrawal function
+     * @dev Withdraws full balance, deducts fee if servicePubKey is set
+     * @param creatorSig Creator's signature
+     */
+    function withdraw(sig creatorSig) {
+        // Verify creator signature
+        require(checkSig(creatorSig, this.creatorPubKey));
+        
+        // Check withdrawal time limit
+        require(tx.time >= this.lastWithdrawalTime + this.minWithdrawalTime, 
+            "Too soon since last withdrawal");
+        
+        // Calculate total balance
+        int totalBalance = tx.value;
+        
+        // Calculate fee and amounts
+        int serviceFee = 0;
+        int creatorAmount = totalBalance;
+        
+        // Only charge fee if service public key is provided
+        if (this.servicePubKey != 0x00 && this.feeBasisPoints > 0) {
+            serviceFee = totalBalance * this.feeBasisPoints / FEE_DENOMINATOR;
+            
+            // Ensure minimum dust limit
+            if (serviceFee < DUST_LIMIT) {
+                serviceFee = 0;
+            }
+            
+            creatorAmount = totalBalance - serviceFee;
+        }
+        
+        // Ensure creator gets at least dust limit
+        require(creatorAmount >= DUST_LIMIT, "Creator amount below dust limit");
+        
+        // Verify outputs
+        if (serviceFee > 0) {
+            // Two outputs: creator + service
+            require(tx.outputs.length == 2, "Expected 2 outputs");
+            
+            // First output to creator
+            require(tx.outputs[0].value >= creatorAmount, "Insufficient creator amount");
+            
+            // Second output to service
+            require(tx.outputs[1].value >= serviceFee, "Insufficient service fee");
+            
+            // Verify service output script matches servicePubKey
+            bytes serviceScript = tx.outputs[1].lockingScript;
+            require(hash160(this.servicePubKey) == extractPubKeyHash(serviceScript),
+                "Service output doesn't match servicePubKey");
+        } else {
+            // Single output to creator
+            require(tx.outputs.length == 1, "Expected 1 output");
+            require(tx.outputs[0].value >= creatorAmount, "Insufficient creator amount");
+        }
+        
+        // Verify creator output script
+        bytes creatorScript = tx.outputs[0].lockingScript;
+        require(hash160(this.creatorPubKey) == extractPubKeyHash(creatorScript),
+            "Creator output doesn't match creatorPubKey");
+    }
+    
+    /**
+     * @notice Withdraw specific amount
+     * @dev Allows partial withdrawals
+     * @param creatorSig Creator's signature
+     * @param amount Amount to withdraw in satoshis
+     */
+    function withdrawAmount(sig creatorSig, int amount) {
+        require(checkSig(creatorSig, this.creatorPubKey));
+        require(tx.time >= this.lastWithdrawalTime + this.minWithdrawalTime);
+        require(amount > 0 && amount <= tx.value, "Invalid amount");
+        
+        // Calculate fee on withdrawn amount only
+        int serviceFee = 0;
+        if (this.servicePubKey != 0x00 && this.feeBasisPoints > 0) {
+            serviceFee = amount * this.feeBasisPoints / FEE_DENOMINATOR;
+            if (serviceFee < DUST_LIMIT) {
+                serviceFee = 0;
+            }
+        }
+        
+        int creatorAmount = amount - serviceFee;
+        require(creatorAmount >= DUST_LIMIT, "Creator amount below dust limit");
+        
+        // Handle outputs
+        if (serviceFee > 0) {
+            require(tx.outputs.length == 3, "Expected 3 outputs");
+            
+            // Output 0: Creator withdrawal
+            require(tx.outputs[0].value >= creatorAmount);
+            require(hash160(this.creatorPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript));
+            
+            // Output 1: Service fee
+            require(tx.outputs[1].value >= serviceFee);
+            require(hash160(this.servicePubKey) == extractPubKeyHash(tx.outputs[1].lockingScript));
+            
+            // Output 2: Change back to contract
+            require(tx.outputs[2].lockingScript == tx.inputs[this.activeInputIndex].lockingScript);
+        } else {
+            require(tx.outputs.length == 2, "Expected 2 outputs");
+            
+            // Output 0: Creator withdrawal
+            require(tx.outputs[0].value >= creatorAmount);
+            require(hash160(this.creatorPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript));
+            
+            // Output 1: Change back to contract
+            require(tx.outputs[1].lockingScript == tx.inputs[this.activeInputIndex].lockingScript);
+        }
+    }
+    
+    /**
+     * @notice Emergency withdrawal after timeout
+     * @dev Allows withdrawal without service fee after 30 days of inactivity
+     * @param creatorSig Creator's signature
+     */
+    function emergencyWithdraw(sig creatorSig) {
+        require(checkSig(creatorSig, this.creatorPubKey));
+        
+        // Can only use emergency withdrawal if no withdrawal in 30 days
+        int THIRTY_DAYS = 2592000;
+        require(tx.time >= this.lastWithdrawalTime + THIRTY_DAYS,
+            "Emergency withdrawal not available yet");
+        
+        // No service fee in emergency withdrawal
+        require(tx.outputs.length == 1, "Expected 1 output");
+        require(tx.outputs[0].value >= tx.value, "Insufficient amount");
+        require(hash160(this.creatorPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript),
+            "Output doesn't match creatorPubKey");
+    }
+    
+    /**
+     * @notice Update contract parameters
+     * @dev Can only be called by creator, updates fee and withdrawal settings
+     * @param creatorSig Creator's signature
+     * @param newFeeBasisPoints New fee percentage (0-200)
+     * @param newMinWithdrawalTime New minimum withdrawal time (0-604800)
+     */
+    function updateSettings(
+        sig creatorSig,
+        int newFeeBasisPoints,
+        int newMinWithdrawalTime
+    ) {
+        require(checkSig(creatorSig, this.creatorPubKey));
+        require(newFeeBasisPoints >= 0 && newFeeBasisPoints <= 200, "Fee must be 0-2%");
+        require(newMinWithdrawalTime >= 0 && newMinWithdrawalTime <= 604800,
+            "Withdrawal time 0-7 days");
+        
+        // Update contract state (deploy new contract in practice)
+        // For CashScript, we would need to create a new contract
+        // This function serves as documentation of allowed parameter ranges
+    }
+    
+    /**
+     * @notice Accept any payment
+     * @dev Fallback function to accept payments without conditions
+     * @param data OP_RETURN data (ignored in contract but used by backend)
+     */
+    function pay(bytes data) {
+        // Anyone can send funds to this contract
+        // The data parameter contains OP_RETURN payload for backend indexing
+        // No validation needed in contract - just accept payment
+        
+        // Minimal validation to prevent spam
+        require(tx.value >= DUST_LIMIT, "Payment below dust limit");
+    }
+    
+    /**
+     * @notice Accept payment with minimum amount
+     * @dev Ensures minimum payment amount
+     * @param minAmount Minimum acceptable payment in satoshis
+     * @param data OP_RETURN data
+     */
+    function payWithMinAmount(int minAmount, bytes data) {
+        require(minAmount >= DUST_LIMIT, "Min amount below dust limit");
+        require(tx.value >= minAmount, "Payment below minimum amount");
+    }
+    
+    /**
+     * @notice Extract public key hash from locking script
+     * @dev Helper function for P2PKH script validation
+     * @param script The locking script
+     * @return pubKeyHash The extracted public key hash
+     */
+    function extractPubKeyHash(bytes script) returns (bytes20) {
+        // P2PKH script pattern: OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG
+        // Bytecode: 0x76 0xa9 0x14 <20-byte-pubKeyHash> 0x88 0xac
+        
+        require(script.length == 25, "Invalid P2PKH script length");
+        require(script[0] == 0x76, "Invalid OP_DUP");
+        require(script[1] == 0xa9, "Invalid OP_HASH160");
+        require(script[2] == 0x14, "Invalid push data");
+        require(script[23] == 0x88, "Invalid OP_EQUALVERIFY");
+        require(script[24] == 0xac, "Invalid OP_CHECKSIG");
+        
+        // Extract the 20-byte public key hash
+        bytes20 pubKeyHash = script[3:23];
+        return pubKeyHash;
+    }
+    
+    /**
+     * @notice Get contract information
+     * @dev Returns contract parameters as OP_RETURN data
+     * @return Contract info encoded as bytes
+     */
+    function getInfo() returns (bytes) {
+        // Encode contract info for frontend
+        bytes memory data = new bytes(45);
+        
+        // Version: 0x01
+        data[0] = 0x01;
+        
+        // Creator pubkey hash (20 bytes)
+        bytes20 creatorHash = hash160(this.creatorPubKey);
+        for (int i = 0; i < 20; i++) {
+            data[1 + i] = creatorHash[i];
+        }
+        
+        // Service pubkey hash (20 bytes, 0x00 if not set)
+        bytes20 serviceHash;
+        if (this.servicePubKey != 0x00) {
+            serviceHash = hash160(this.servicePubKey);
+        }
+        for (int i = 0; i < 20; i++) {
+            data[21 + i] = serviceHash[i];
+        }
+        
+        // Fee basis points (2 bytes, big-endian)
+        data[41] = byte(this.feeBasisPoints >> 8);
+        data[42] = byte(this.feeBasisPoints & 0xFF);
+        
+        // Min withdrawal time (2 bytes, big-endian, in hours)
+        int hours = this.minWithdrawalTime / 3600;
+        data[43] = byte(hours >> 8);
+        data[44] = byte(hours & 0xFF);
+        
+        return data;
+    }
+}
+

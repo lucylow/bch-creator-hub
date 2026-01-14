@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import StatCard from '@/components/Dashboard/StatCard';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import QuickActions from '@/components/Dashboard/QuickActions';
+import BalanceChart from '@/components/Dashboard/BalanceChart';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
 import { useCreator } from '@/contexts/CreatorContext';
 import { formatBCH, formatUSD } from '@/utils/formatters';
@@ -147,23 +148,17 @@ const DashboardPage = () => {
               </div>
             </div>
             
-            {/* Simple chart placeholder */}
-            <div className="h-64 flex items-end justify-between gap-2 px-4">
-              {[40, 65, 45, 80, 55, 90, 70].map((height, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${height}%` }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex-1 bg-gradient-to-t from-primary to-primary/50 rounded-t-lg"
-                />
-              ))}
-            </div>
-            <div className="flex justify-between mt-4 px-4 text-sm text-muted-foreground">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
+            <BalanceChart 
+              data={stats.chartData || [
+                { label: 'Mon', value: 40000000 },
+                { label: 'Tue', value: 65000000 },
+                { label: 'Wed', value: 45000000 },
+                { label: 'Thu', value: 80000000 },
+                { label: 'Fri', value: 55000000 },
+                { label: 'Sat', value: 90000000 },
+                { label: 'Sun', value: 70000000 },
+              ]} 
+            />
           </motion.div>
           
           <QuickActions />

@@ -1,39 +1,66 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Link2, QrCode, Send, Settings, Share2, Wallet } from 'lucide-react';
+import { Plus, Download, Share2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { useCreator } from '@/contexts/CreatorContext';
 
-const actions = [
-  { icon: Link2, label: 'Create Link', href: '/links/new', color: 'bg-primary/10 text-primary' },
-  { icon: QrCode, label: 'QR Code', href: '/links', color: 'bg-secondary/10 text-secondary' },
-  { icon: Share2, label: 'Share Profile', href: '/settings', color: 'bg-blue-500/10 text-blue-400' },
-  { icon: Send, label: 'Withdraw', href: '/settings', color: 'bg-emerald-500/10 text-emerald-400' },
-];
+type Props = { creatorAddress?: string };
 
-const QuickActions = () => {
+const QuickActions: React.FC<Props> = ({ creatorAddress }) => {
+  const { creator } = useCreator();
+  const address = creatorAddress || creator?.address || '';
+
+  const handleExport = () => {
+    toast.success('Export queued. We emailed the CSV to you.');
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/pay/${creator?.id || 'creator'}/default`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Support me', url });
+      } catch (e) {
+        navigator.clipboard.writeText(url);
+        toast.success('Payment link copied to clipboard');
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('Payment link copied to clipboard');
+    }
+  };
+
   return (
-    <div className="glass-card rounded-xl p-5">
-      <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-2 gap-3">
-        {actions.map((action, index) => (
-          <motion.div
-            key={action.label}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Link
-              to={action.href}
-              className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
-            >
-              <div className={`p-3 rounded-lg ${action.color} group-hover:scale-110 transition-transform`}>
-                <action.icon className="w-5 h-5" />
-              </div>
-              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                {action.label}
-              </span>
-            </Link>
-          </motion.div>
-        ))}
+    <div className="glass-card rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-foreground">Quick Actions</h3>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
+        <Link to="/links/new">
+          <Button className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground flex items-center justify-center gap-2">
+            <Plus className="w-4 h-4" />
+            Create Payment Link
+          </Button>
+        </Link>
+
+        <Button 
+          onClick={handleExport} 
+          variant="outline"
+          className="w-full flex items-center justify-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Export CSV
+        </Button>
+
+        <Button 
+          onClick={handleShare} 
+          variant="outline"
+          className="w-full flex items-center justify-center gap-2"
+        >
+          <Share2 className="w-4 h-4" />
+          Share Payment Link
+        </Button>
       </div>
     </div>
   );

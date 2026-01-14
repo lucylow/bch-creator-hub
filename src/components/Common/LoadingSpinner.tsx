@@ -1,34 +1,30 @@
-import { motion } from 'framer-motion';
+import React from 'react';
 
-interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
+type Props = {
+  size?: number;
+  text?: string;
   fullScreen?: boolean;
-}
+};
 
-const LoadingSpinner = ({ size = 'md', fullScreen = true }: LoadingSpinnerProps) => {
-  const sizeClasses = {
-    sm: 'w-6 h-6',
-    md: 'w-10 h-10',
-    lg: 'w-16 h-16',
-  };
-
-  const spinner = (
-    <motion.div
-      className={`${sizeClasses[size]} border-4 border-muted border-t-primary rounded-full`}
-      animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-    />
-  );
-
-  if (fullScreen) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        {spinner}
+const LoadingSpinner: React.FC<Props> = ({ size = 48, text = 'Loading...', fullScreen = false }) => {
+  const wrapperClass = fullScreen ? 'min-h-screen flex items-center justify-center' : 'flex items-center';
+  return (
+    <div className={wrapperClass}>
+      <div className="flex items-center space-x-4">
+        <div
+          className="rounded-full animate-spin border-4"
+          style={{
+            width: size,
+            height: size,
+            borderColor: 'rgba(255,255,255,0.08)',
+            borderTopColor: 'hsl(var(--primary))',
+            borderRadius: '50%',
+          }}
+        />
+        {text && <div className="text-muted-foreground">{text}</div>}
       </div>
-    );
-  }
-
-  return spinner;
+    </div>
+  );
 };
 
 export default LoadingSpinner;

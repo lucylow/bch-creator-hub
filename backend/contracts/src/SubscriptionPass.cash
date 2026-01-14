@@ -1,0 +1,305 @@
+pragma cashscript ^0.9.0;
+
+/**
+ * @title SubscriptionPass
+ * @notice CashToken-based subscription system
+ * @dev Uses BCH-2023-02 CashTokens for subscription passes
+ * Features:
+ * - NFT-based subscription passes
+ * - Time-locked access
+ * - Renewable subscriptions
+ * - Transferable passes
+ */
+contract SubscriptionPass {
+    // Constants
+    int constant DUST_LIMIT = 546;
+    int constant MONTH_SECONDS = 2592000; // 30 days
+    
+    // Contract state
+    pubkey creatorPubKey;          // Creator's public key
+    bytes20 tokenCategory;         // CashToken category ID
+    int subscriptionPrice;         // Price per month in satoshis
+    int subscriptionPeriod;        // Subscription period in seconds
+    
+    // Commitment for token genesis
+    bytes commitment;
+    
+    /**
+     * @notice Constructor
+     * @param _creatorPubKey Creator's public key
+     * @param _tokenCategory Token category ID (0x00 for new tokens)
+     * @param _subscriptionPrice Price in satoshis per period
+     * @param _subscriptionPeriod Period length in seconds
+     */
+    constructor(
+        pubkey _creatorPubKey,
+        bytes20 _tokenCategory,
+        int _subscriptionPrice,
+        int _subscriptionPeriod
+    ) {
+        require(_subscriptionPrice >= DUST_LIMIT, "Price below dust limit");
+        require(_subscriptionPeriod > 0, "Period must be positive");
+        
+        creatorPubKey = _creatorPubKey;
+        tokenCategory = _tokenCategory;
+        subscriptionPrice = _subscriptionPrice;
+        subscriptionPeriod = _subscriptionPeriod;
+        
+        // Create commitment for token genesis
+        commitment = hash160(_creatorPubKey);
+    }
+    
+    /**
+     * @notice Purchase a new subscription pass
+     * @dev Mints a new NFT and sends to buyer
+     * @param buyerPubKey Buyer's public key
+     * @param numPeriods Number of subscription periods to purchase
+     */
+    function purchaseSubscription(
+        pubkey buyerPubKey,
+        int numPeriods
+    ) {
+        require(numPeriods > 0 && numPeriods <= 12, "1-12 periods allowed");
+        
+        // Calculate total price
+        int totalPrice = subscriptionPrice * numPeriods;
+        require(tx.value >= totalPrice, "Insufficient payment");
+        
+        // Calculate expiration time
+        int expirationTime = tx.time + (subscriptionPeriod * numPeriods);
+        
+        // Generate unique NFT ID
+        bytes32 nftId = sha256(tx.hash + bytes8(tx.seq));
+        
+        // Output 0: Subscription NFT to buyer
+        // Contains commitment with expiration time
+        bytes memory nftCommitment = encodeExpiration(expirationTime);
+        
+        require(tx.outputs[0].value >= DUST_LIMIT, "NFT output below dust");
+        require(hasToken(tx.outputs[0], tokenCategory, nftId, nftCommitment),
+            "Invalid NFT output");
+        require(hash160(buyerPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript),
+            "NFT not sent to buyer");
+        
+        // Output 1: Payment to creator
+        require(tx.outputs[1].value >= totalPrice, "Insufficient creator payment");
+        require(hash160(creatorPubKey) == extractPubKeyHash(tx.outputs[1].lockingScript),
+            "Payment not sent to creator");
+        
+        // Output 2: Change (if any)
+        if (tx.outputs.length > 2) {
+            require(tx.outputs[2].lockingScript == tx.inputs[this.activeInputIndex].lockingScript,
+                "Invalid change output");
+        }
+    }
+    
+    /**
+     * @notice Renew an existing subscription
+     * @dev Extends expiration time of existing NFT
+     * @param nftInputIndex Index of NFT input
+     * @param numPeriods Number of additional periods
+     */
+    function renewSubscription(
+        int nftInputIndex,
+        int numPeriods
+    ) {
+        require(numPeriods > 0 && numPeriods <= 12, "1-12 periods allowed");
+        
+        // Get NFT input
+        require(nftInputIndex >= 0 && nftInputIndex < tx.inputs.length,
+            "Invalid NFT input index");
+        bytes nftScript = tx.inputs[nftInputIndex].lockingScript;
+        
+        // Verify NFT belongs to this contract
+        require(hasAnyToken(nftScript, tokenCategory),
+            "Input is not subscription NFT");
+        
+        // Extract current expiration from commitment
+        bytes memory currentCommitment = getTokenCommitment(nftScript);
+        int currentExpiration = decodeExpiration(currentCommitment);
+        require(currentExpiration > 0, "Invalid expiration");
+        
+        // Calculate new expiration
+        int newExpiration;
+        if (currentExpiration < tx.time) {
+            // Subscription expired, renew from now
+            newExpiration = tx.time + (subscriptionPeriod * numPeriods);
+        } else {
+            // Extend existing subscription
+            newExpiration = currentExpiration + (subscriptionPeriod * numPeriods);
+        }
+        
+        // Calculate price
+        int totalPrice = subscriptionPrice * numPeriods;
+        require(tx.value >= totalPrice, "Insufficient payment");
+        
+        // Output 0: Updated NFT with new expiration
+        bytes memory newCommitment = encodeExpiration(newExpiration);
+        require(tx.outputs[0].value >= DUST_LIMIT, "NFT output below dust");
+        require(hasToken(tx.outputs[0], tokenCategory, getTokenId(nftScript), newCommitment),
+            "Invalid NFT output");
+        
+        // Output 1: Payment to creator
+        require(tx.outputs[1].value >= totalPrice, "Insufficient creator payment");
+        require(hash160(creatorPubKey) == extractPubKeyHash(tx.outputs[1].lockingScript),
+            "Payment not sent to creator");
+        
+        // Output 2: Change (if any)
+        if (tx.outputs.length > 2) {
+            require(tx.outputs[2].lockingScript == tx.inputs[this.activeInputIndex].lockingScript,
+                "Invalid change output");
+        }
+    }
+    
+    /**
+     * @notice Transfer subscription NFT
+     * @dev Allows NFT owner to transfer to another address
+     * @param sellerSig Seller's signature
+     * @param newOwnerPubKey New owner's public key
+     */
+    function transferSubscription(
+        sig sellerSig,
+        pubkey newOwnerPubKey
+    ) {
+        // Verify seller owns the NFT
+        require(checkSig(sellerSig, extractPubKeyFromScript(tx.inputs[this.activeInputIndex].lockingScript)),
+            "Invalid seller signature");
+        
+        // Verify input is subscription NFT
+        require(hasAnyToken(tx.inputs[this.activeInputIndex].lockingScript, tokenCategory),
+            "Input is not subscription NFT");
+        
+        // Get NFT ID and commitment
+        bytes32 nftId = getTokenId(tx.inputs[this.activeInputIndex].lockingScript);
+        bytes memory commitment = getTokenCommitment(tx.inputs[this.activeInputIndex].lockingScript);
+        
+        // Output 0: NFT transferred to new owner
+        require(tx.outputs[0].value >= DUST_LIMIT, "NFT output below dust");
+        require(hasToken(tx.outputs[0], tokenCategory, nftId, commitment),
+            "Invalid NFT output");
+        require(hash160(newOwnerPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript),
+            "NFT not sent to new owner");
+    }
+    
+    /**
+     * @notice Check if subscription is valid
+     * @dev Helper function for frontend to verify subscription status
+     * @param nftScript The NFT locking script
+     * @return isValid True if subscription is active
+     * @return expirationTime Unix timestamp of expiration
+     */
+    function checkSubscription(bytes nftScript) returns (bool, int) {
+        if (!hasAnyToken(nftScript, tokenCategory)) {
+            return (false, 0);
+        }
+        
+        bytes memory commitment = getTokenCommitment(nftScript);
+        int expirationTime = decodeExpiration(commitment);
+        
+        if (expirationTime <= 0) {
+            return (false, 0);
+        }
+        
+        bool isValid = expirationTime > tx.time;
+        return (isValid, expirationTime);
+    }
+    
+    /**
+     * @notice Encode expiration time into commitment
+     * @dev Stores expiration as 8-byte big-endian in commitment
+     * @param expiration Unix timestamp
+     * @return commitment Encoded commitment bytes
+     */
+    function encodeExpiration(int expiration) returns (bytes) {
+        bytes memory data = new bytes(8);
+        
+        // Encode as 8-byte big-endian
+        for (int i = 7; i >= 0; i--) {
+            data[i] = byte(expiration & 0xFF);
+            expiration = expiration >> 8;
+        }
+        
+        return data;
+    }
+    
+    /**
+     * @notice Decode expiration time from commitment
+     * @dev Extracts expiration from 8-byte big-endian in commitment
+     * @param commitment Encoded commitment bytes
+     * @return expiration Unix timestamp
+     */
+    function decodeExpiration(bytes commitment) returns (int) {
+        require(commitment.length >= 8, "Invalid commitment length");
+        
+        int expiration = 0;
+        
+        // Decode 8-byte big-endian
+        for (int i = 0; i < 8; i++) {
+            expiration = (expiration << 8) | int(commitment[i]);
+        }
+        
+        return expiration;
+    }
+    
+    /**
+     * @notice Update subscription price
+     * @dev Can only be called by creator
+     * @param creatorSig Creator's signature
+     * @param newPrice New subscription price in satoshis
+     */
+    function updatePrice(sig creatorSig, int newPrice) {
+        require(checkSig(creatorSig, this.creatorPubKey));
+        require(newPrice >= DUST_LIMIT, "Price below dust limit");
+        
+        // Update price for new subscriptions
+        subscriptionPrice = newPrice;
+    }
+    
+    // Helper functions for CashToken handling
+    function hasToken(bytes output, bytes20 category, bytes32 tokenId, bytes commitment) returns (bool) {
+        // Implementation depends on CashToken library
+        // This is a placeholder for the actual CashToken verification
+        return true;
+    }
+    
+    function hasAnyToken(bytes script, bytes20 category) returns (bool) {
+        // Check if script contains any token of given category
+        return true;
+    }
+    
+    function getTokenId(bytes script) returns (bytes32) {
+        // Extract token ID from script
+        return sha256(script);
+    }
+    
+    function getTokenCommitment(bytes script) returns (bytes) {
+        // Extract commitment from token-bearing script
+        return script[script.length - 8:];
+    }
+    
+    function extractPubKeyHash(bytes script) returns (bytes20) {
+        // Same as CreatorRouter implementation
+        require(script.length == 25, "Invalid P2PKH script length");
+        require(script[0] == 0x76, "Invalid OP_DUP");
+        require(script[1] == 0xa9, "Invalid OP_HASH160");
+        require(script[2] == 0x14, "Invalid push data");
+        require(script[23] == 0x88, "Invalid OP_EQUALVERIFY");
+        require(script[24] == 0xac, "Invalid OP_CHECKSIG");
+        
+        return script[3:23];
+    }
+    
+    function extractPubKeyFromScript(bytes script) returns (pubkey) {
+        // Extract public key from P2PKH input script
+        // Format: <signature> <publicKey>
+        require(script.length >= 107, "Invalid input script length");
+        
+        // Public key is the last 33 or 65 bytes
+        int pubKeyLength = int(script[script.length - 1]);
+        require(pubKeyLength == 33 || pubKeyLength == 65, "Invalid pubkey length");
+        
+        bytes memory pubKeyBytes = script[script.length - pubKeyLength - 1:script.length - 1];
+        return pubKeyBytes;
+    }
+}
+
