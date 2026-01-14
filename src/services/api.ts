@@ -270,6 +270,13 @@ class ApiService {
     return this.request<TransactionStats>('/api/transactions/stats/summary');
   }
 
+  /**
+   * Get withdrawals
+   */
+  async getWithdrawals(): Promise<ApiResponse<{ withdrawals: any[] }>> {
+    return this.request<{ withdrawals: any[] }>('/api/withdrawals');
+  }
+
   // ============ Analytics Endpoints ============
 
   /**

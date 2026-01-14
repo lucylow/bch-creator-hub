@@ -22,7 +22,7 @@ const TransactionsPage = () => {
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['transactions', dateRange],
     queryFn: async () => {
-      const response = await apiService.getTransactions({ limit: 100, offset: 0 });
+      const response = await apiService.getTransactions({ limit: 100, page: 1 });
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to load transactions');
       }

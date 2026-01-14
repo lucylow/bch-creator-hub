@@ -46,7 +46,7 @@ async function markContractUtxosSpent(txid) {
  * @param {Object} tx - Transaction object (from bchjs or bitcore)
  * @param {number} blockHeight - Block height
  */
-async function processTransactionForContractUtxos(tx, blockHeight) {
+async function processTransactionForContractUtxos(tx, _blockHeight) {
   try {
     // Get all active contract addresses
     const contractsRes = await query(

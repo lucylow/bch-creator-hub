@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, DollarSign, Users, Clock, BarChart3, ArrowLeft, Link2 } from 'lucide-react';
 import { formatBCH } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
+import Breadcrumbs from '@/components/Common/Breadcrumbs';
 
 const AnalyticsPage = () => {
   const [period, setPeriod] = useState('30');
@@ -25,6 +26,11 @@ const AnalyticsPage = () => {
   return (
     <div className="min-h-screen pt-24 pb-12 px-6">
       <div className="max-w-7xl mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
+        </div>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>

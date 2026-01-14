@@ -1,8 +1,7 @@
 const SubscriptionService = require('../services/subscription.service');
 const { SUBSCRIPTION_TIERS, SUBSCRIPTION_PRICING } = require('../config/constants');
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
-const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
+const { ValidationError } = require('../utils/errors');
 
 class SubscriptionController {
   // Get current subscription

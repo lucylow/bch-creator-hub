@@ -1,7 +1,6 @@
 const WithdrawalService = require('../services/withdrawal.service');
 const Withdrawal = require('../models/Withdrawal');
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
 const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
 
 class WithdrawalController {

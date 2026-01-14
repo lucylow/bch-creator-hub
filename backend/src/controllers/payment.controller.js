@@ -1,13 +1,9 @@
 const PaymentIntent = require('../models/PaymentIntent');
-const Transaction = require('../models/Transaction');
 const PaymentService = require('../services/payment.service');
 const { validationResult } = require('express-validator');
-const { generateRandomId } = require('../utils/generators');
-const logger = require('../utils/logger');
-const { ValidationError, NotFoundError, ConflictError, AppError } = require('../utils/errors');
+const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
 const MicropaymentService = require('../services/micropayment.service');
 const QRCodeUtil = require('../utils/qrcode.util');
-const { MICROPAYMENT } = require('../config/constants');
 
 class PaymentController {
   // Create payment intent

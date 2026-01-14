@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Routes, Route } from 'react-router-dom';
 import { ReactNode } from 'react';
 
 interface PageTransitionProps {
@@ -40,6 +40,7 @@ const PageTransition = ({ children }: PageTransitionProps) => {
         animate="enter"
         exit="exit"
         variants={pageVariants}
+        className="w-full"
       >
         {children}
       </motion.div>

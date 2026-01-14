@@ -8,10 +8,16 @@ import MintForm from '@/components/NFT/MintForm';
 import BuyNFT from '@/components/NFT/BuyNFT';
 import NFTGallery from '@/components/NFT/NFTGallery';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Breadcrumbs from '@/components/Common/Breadcrumbs';
 
 export default function NFTsPage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="container mx-auto px-4 pt-24 pb-12 max-w-6xl">
+      {/* Breadcrumbs */}
+      <div className="mb-4">
+        <Breadcrumbs />
+      </div>
+
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <Link to="/dashboard">

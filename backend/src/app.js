@@ -4,7 +4,6 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const { createBullBoard } = require('bull-board');
-const { BullAdapter } = require('bull-board');
 
 const authRoutes = require('./routes/auth.routes');
 const creatorRoutes = require('./routes/creator.routes');

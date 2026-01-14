@@ -1,7 +1,6 @@
 const Creator = require('../models/Creator');
 const Transaction = require('../models/Transaction');
 const PaymentIntent = require('../models/PaymentIntent');
-const logger = require('../utils/logger');
 
 class AnalyticsController {
   // Get comprehensive analytics
@@ -54,7 +53,7 @@ class AnalyticsController {
     }
   }
 
-  async calculateGrowthMetrics(creatorId, period) {
+  async calculateGrowthMetrics(_creatorId, _period) {
     // Simplified for hackathon
     // In production, calculate actual growth percentages
     return {
@@ -67,8 +66,8 @@ class AnalyticsController {
   // Get earnings chart data
   async getEarningsChart(req, res, next) {
     try {
-      const creatorId = req.creator.creator_id;
-      const { period = '30d', interval = 'day' } = req.query;
+      const _creatorId = req.creator.creator_id;
+      const { period = '30d' } = req.query;
 
       // Simplified for hackathon - in production, query actual data grouped by interval
       const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;

@@ -1,8 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bip322 = require('../utils/bip322');
 const Creator = require('../models/Creator');
-const logger = require('../utils/logger');
-const { ValidationError, AuthenticationError, AppError } = require('../utils/errors');
+const { ValidationError, AuthenticationError } = require('../utils/errors');
 
 class AuthController {
   // Wallet authentication

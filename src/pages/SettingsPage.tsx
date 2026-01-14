@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useCreator } from '@/contexts/CreatorContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { truncateAddress, formatBCH } from '@/utils/formatters';
+import Breadcrumbs from '@/components/Common/Breadcrumbs';
 
 const SettingsPage = () => {
   const { creator, updateCreator } = useCreator();
@@ -42,6 +43,11 @@ const SettingsPage = () => {
   return (
     <div className="min-h-screen pt-24 pb-12 px-6">
       <div className="max-w-4xl mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
+        </div>
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">

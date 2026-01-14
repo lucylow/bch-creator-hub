@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Wallet, 
@@ -392,10 +392,7 @@ const InteractiveDemo = () => {
                             </p>
                           </div>
                           {isActive && (
-                            <motion.div
-                              layoutId="activeIndicator"
-                              className="w-2 h-2 rounded-full bg-primary"
-                            />
+                            <div className="w-2 h-2 rounded-full bg-primary" />
                           )}
                         </motion.div>
                       );

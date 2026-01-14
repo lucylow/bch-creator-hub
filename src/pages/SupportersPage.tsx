@@ -20,7 +20,7 @@ const SupportersPage = () => {
     queryFn: async () => {
       // This would typically come from a supporters/analytics endpoint
       // For now, we'll use transactions to derive supporter data
-      const response = await apiService.getTransactions({ limit: 500, offset: 0 });
+      const response = await apiService.getTransactions({ limit: 500, page: 1 });
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to load supporters');
       }

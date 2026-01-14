@@ -1,6 +1,5 @@
 const Webhook = require('../models/Webhook');
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
 const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
 
 class WebhookController {

@@ -2,8 +2,7 @@ const Creator = require('../models/Creator');
 const Transaction = require('../models/Transaction');
 const ContractService = require('../services/contract.service');
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
-const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
+const { ValidationError, AppError } = require('../utils/errors');
 
 class CreatorController {
   // Get creator profile

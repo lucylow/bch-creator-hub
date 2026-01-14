@@ -6,6 +6,7 @@ import ProblemSection from '@/components/ProblemSection';
 import SolutionSection from '@/components/SolutionSection';
 import FeaturesSection from '@/components/FeaturesSection';
 import HowItWorksSection from '@/components/HowItWorksSection';
+import InteractiveDemo from '@/components/InteractiveDemo';
 import WaitlistSection from '@/components/WaitlistSection';
 import Footer from '@/components/Footer';
 
@@ -17,6 +18,7 @@ const Index = () => {
       <main className="relative z-10">
         <HeroSection />
         <StatsSection />
+        <InteractiveDemo />
         <ProblemSection />
         <SolutionSection />
         <FeaturesSection />

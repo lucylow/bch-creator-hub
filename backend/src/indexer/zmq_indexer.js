@@ -216,7 +216,7 @@ async function main() {
 
       // fetch block header / details
       const blockInfo = await bchjs.Blockbook.getBlock(blockHashRaw);
-      const height = blockInfo.height;
+      const _height = blockInfo.height;
       const prevHash = blockInfo.previousblockhash;
 
       const tip = await getTip(); // local tip

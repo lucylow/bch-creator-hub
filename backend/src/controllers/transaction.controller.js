@@ -1,7 +1,5 @@
 const Transaction = require('../models/Transaction');
-const Creator = require('../models/Creator');
 const MicropaymentService = require('../services/micropayment.service');
-const logger = require('../utils/logger');
 const { NotFoundError, AppError } = require('../utils/errors');
 
 class TransactionController {

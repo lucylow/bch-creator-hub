@@ -15,6 +15,10 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import PaymentPage from "./pages/PaymentPage";
 import NFTsPage from "./pages/NFTsPage";
+import TransactionsPage from "./pages/TransactionsPage";
+import WithdrawalsPage from "./pages/WithdrawalsPage";
+import SupportersPage from "./pages/SupportersPage";
+import HelpPage from "./pages/HelpPage";
 import AppNavigation from "./components/Navigation/AppNavigation";
 import PageTransition from "./components/Common/PageTransition";
 import NotFound from "./pages/NotFound";
@@ -44,17 +48,21 @@ const App = () => (
               <BrowserRouter>
                 <AppNavigation />
                 <PageTransition>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/links" element={<PaymentLinksPage />} />
-                    <Route path="/links/new" element={<CreateLinkPage />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/nfts" element={<NFTsPage />} />
-                    <Route path="/pay/:creatorId" element={<PaymentPage />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/links" element={<PaymentLinksPage />} />
+                  <Route path="/links/new" element={<CreateLinkPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/nfts" element={<NFTsPage />} />
+                  <Route path="/transactions" element={<TransactionsPage />} />
+                  <Route path="/withdrawals" element={<WithdrawalsPage />} />
+                  <Route path="/supporters" element={<SupportersPage />} />
+                  <Route path="/help" element={<HelpPage />} />
+                  <Route path="/pay/:creatorId" element={<PaymentPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
                 </PageTransition>
               </BrowserRouter>
             </CreatorProvider>

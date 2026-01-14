@@ -90,6 +90,7 @@ const AppNavigation = () => {
                 <NavLink
                   key={link.path}
                   to={link.path}
+                  end={link.exact}
                   className={({ isActive: navIsActive }) =>
                     cn(
                       'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 relative',
@@ -195,6 +196,7 @@ const AppNavigation = () => {
                           >
                             <NavLink
                               to={link.path}
+                              end={link.exact}
                               onClick={() => setIsOpen(false)}
                               className={({ isActive: navIsActive }) =>
                                 cn(

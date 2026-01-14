@@ -6,6 +6,7 @@ const Transaction = require('../models/Transaction');
 const NotificationService = require('../services/notification.service');
 const CashTokenService = require('../services/cashtoken.service');
 const logger = require('../utils/logger');
+const { ExternalServiceError, DatabaseError, AppError } = require('../utils/errors');
 
 class TransactionScanner {
   constructor() {
