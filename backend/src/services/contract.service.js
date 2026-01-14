@@ -3,7 +3,7 @@ const { compileFile } = require('cashc');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
-const { AppError, ExternalServiceError } = require('../utils/errors');
+const { AppError, ExternalServiceError, ValidationError, NotFoundError } = require('../utils/errors');
 const bchConfig = require('../config/bch');
 
 class ContractService {
@@ -100,41 +100,154 @@ class ContractService {
     amountSats,
     feeBasisPoints = 100
   ) {
+    // Input validation
+    if (!contractAddress || typeof contractAddress !== 'string') {
+      throw new ValidationError('Contract address is required', {
+        context: { contractAddress }
+      });
+    }
+
+    if (!creatorPrivateKey) {
+      throw new ValidationError('Creator private key is required');
+    }
+
+    if (!amountSats || amountSats <= 0 || !Number.isInteger(amountSats)) {
+      throw new ValidationError('Amount must be a positive integer in satoshis', {
+        context: { amountSats }
+      });
+    }
+
+    if (feeBasisPoints < 0 || feeBasisPoints > 10000) {
+      throw new ValidationError('Fee basis points must be between 0 and 10000', {
+        context: { feeBasisPoints }
+      });
+    }
+
     try {
       const contract = await this.getContract(contractAddress);
       
       if (!contract) {
-        throw new AppError('Contract not found or not deployed', 404);
+        throw new NotFoundError('Contract', {
+          context: { contractAddress }
+        });
       }
       
       // Calculate service fee
       const serviceFee = Math.floor(amountSats * feeBasisPoints / 10000);
       const creatorAmount = amountSats - serviceFee;
 
+      if (creatorAmount <= 0) {
+        throw new ValidationError('Amount after fees must be greater than zero', {
+          context: { amountSats, serviceFee, creatorAmount }
+        });
+      }
+
       // Get contract UTXOs
-      const utxos = await this.getContractUtxos(contractAddress);
+      let utxos;
+      try {
+        utxos = await this.getContractUtxos(contractAddress);
+      } catch (error) {
+        logger.error('Error fetching contract UTXOs:', {
+          error: {
+            name: error.name,
+            message: error.message
+          },
+          contractAddress
+        });
+        throw new ExternalServiceError('BCH Service', 'Failed to fetch contract UTXOs', {
+          context: { contractAddress },
+          retryable: true
+        });
+      }
       
-      if (utxos.length === 0) {
-        throw new Error('No funds in contract');
+      if (!Array.isArray(utxos) || utxos.length === 0) {
+        throw new AppError('No funds available in contract', 400, {
+          context: { contractAddress },
+          errorCode: 'INSUFFICIENT_FUNDS'
+        });
+      }
+
+      // Calculate total available balance
+      const totalBalance = utxos.reduce((sum, utxo) => sum + (utxo.satoshis || utxo.value || 0), 0);
+      
+      if (totalBalance < amountSats) {
+        throw new AppError('Insufficient contract balance', 400, {
+          context: { 
+            contractAddress, 
+            requested: amountSats, 
+            available: totalBalance 
+          },
+          errorCode: 'INSUFFICIENT_BALANCE'
+        });
       }
 
       // Create transaction
-      const tx = contract.functions
-        .withdraw(creatorPrivateKey)
-        .from(utxos)
-        .to(creatorPrivateKey.toAddress(), creatorAmount);
+      let tx;
+      try {
+        tx = contract.functions
+          .withdraw(creatorPrivateKey)
+          .from(utxos)
+          .to(creatorPrivateKey.toAddress(), creatorAmount);
 
-      // Add service fee output if applicable
-      if (serviceFee > 0 && process.env.SERVICE_PUB_KEY) {
-        const serviceAddress = this.getServiceAddress();
-        tx.to(serviceAddress, serviceFee);
+        // Add service fee output if applicable
+        if (serviceFee > 0 && process.env.SERVICE_PUB_KEY) {
+          const serviceAddress = this.getServiceAddress();
+          if (!serviceAddress) {
+            logger.warn('Service public key set but service address unavailable');
+          } else {
+            tx.to(serviceAddress, serviceFee);
+          }
+        }
+
+        // Set change address
+        tx.withChange(creatorPrivateKey.toAddress());
+      } catch (error) {
+        logger.error('Error building withdrawal transaction:', {
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          },
+          contractAddress
+        });
+        throw new AppError('Failed to build withdrawal transaction', 500, {
+          context: { contractAddress, error: error.message },
+          isOperational: false
+        });
       }
 
-      // Set change address
-      tx.withChange(creatorPrivateKey.toAddress());
-
       // Send transaction
-      const result = await tx.send();
+      let result;
+      try {
+        result = await tx.send();
+        
+        if (!result || !result.txid) {
+          throw new AppError('Transaction sent but no transaction ID returned', 500, {
+            context: { contractAddress }
+          });
+        }
+      } catch (error) {
+        logger.error('Error sending withdrawal transaction:', {
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          },
+          contractAddress
+        });
+        
+        if (error.message?.includes('insufficient') || error.message?.includes('balance')) {
+          throw new AppError('Insufficient balance for withdrawal', 400, {
+            context: { contractAddress, amountSats },
+            errorCode: 'INSUFFICIENT_BALANCE'
+          });
+        }
+        
+        throw new ExternalServiceError('BCH Service', 'Failed to broadcast withdrawal transaction', {
+          context: { contractAddress, error: error.message },
+          retryable: true
+        });
+      }
       
       return {
         success: true,
@@ -144,8 +257,25 @@ class ContractService {
         change: result.change
       };
     } catch (error) {
-      logger.error('Withdrawal error:', error);
-      throw error;
+      // Re-throw AppError and custom errors as-is
+      if (error instanceof AppError || error instanceof ValidationError || 
+          error instanceof NotFoundError || error instanceof ExternalServiceError) {
+        throw error;
+      }
+      
+      logger.error('Unexpected withdrawal error:', {
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        },
+        contractAddress
+      });
+      
+      throw new AppError('Withdrawal failed', 500, {
+        context: { contractAddress, error: error.message },
+        isOperational: false
+      });
     }
   }
 
