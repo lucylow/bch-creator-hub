@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   AuthRequest,
   AuthResponse,
+  ChallengeResponse,
   User,
   Creator,
   CreatorUpdate,

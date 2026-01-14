@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
 import { WagmiProvider } from 'wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { hardhat, sepolia } from 'wagmi/chains';
 import '@rainbow-me/rainbowkit/styles.css';
@@ -20,8 +19,6 @@ const config = getDefaultConfig({
   ssr: false,
 });
 
-const queryClient = new QueryClient();
-
 interface EVMProviderProps {
   children: ReactNode;
 }
@@ -29,11 +26,9 @@ interface EVMProviderProps {
 export function EVMProvider({ children }: EVMProviderProps) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
-          {children}
-        </RainbowKitProvider>
-      </QueryClientProvider>
+      <RainbowKitProvider>
+        {children}
+      </RainbowKitProvider>
     </WagmiProvider>
   );
 }
