@@ -46,6 +46,72 @@ npm run dev
 npm start
 ```
 
+## Network Configuration
+
+The backend supports both **testnet** and **mainnet** networks. By default, it uses **testnet** for safety.
+
+### Quick Network Switching
+
+```bash
+# Switch to testnet (safe for development)
+npm run network:testnet
+
+# Switch to mainnet (⚠️ uses real BCH!)
+npm run network:mainnet
+
+# Check current network status
+npm run network:status
+```
+
+### Manual Configuration
+
+Set the `BCH_NETWORK` environment variable in your `.env` file:
+
+```env
+# For testnet (default, safe)
+BCH_NETWORK=testnet
+
+# For mainnet (⚠️ real BCH!)
+BCH_NETWORK=mainnet
+```
+
+### Network-Specific Settings
+
+**Testnet:**
+- Safe for development and testing
+- Uses testnet BCH (no real value)
+- Explorer: https://www.blockchain.com/bch-testnet
+- Default network for all services
+
+**Mainnet:**
+- Uses real BCH (real value!)
+- Requires careful configuration
+- Explorer: https://www.blockchain.com/bch
+- ⚠️ Double-check all settings before using
+
+### Network Configuration Details
+
+The network configuration is centralized in `src/config/bch.js` and includes:
+- REST API URLs
+- WebSocket URLs
+- Blockchain explorer URLs
+- ZMQ connection settings
+- Network-specific constants
+
+All services (BCHService, ContractService, etc.) automatically use the configured network.
+
+### Contract Deployment
+
+Deploy contracts to specific networks:
+
+```bash
+# Deploy to testnet
+npm run deploy:contracts:testnet
+
+# Deploy to mainnet
+npm run deploy:contracts:mainnet
+```
+
 ## Docker Setup
 
 ```bash

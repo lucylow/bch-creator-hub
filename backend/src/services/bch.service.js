@@ -3,14 +3,16 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 const { ExternalServiceError, AppError } = require('../utils/errors');
 
+const bchConfig = require('../config/bch');
+
 class BCHService {
   constructor() {
     this.bchjs = new BCHJS({
-      restURL: process.env.BCH_REST_URL || 'https://api.fullstack.cash/v5/',
-      apiToken: process.env.BCH_API_TOKEN
+      restURL: bchConfig.restUrl,
+      apiToken: bchConfig.apiToken
     });
     
-    this.network = process.env.BCH_NETWORK || 'mainnet';
+    this.network = bchConfig.network;
     this.feePerByte = 1.0; // satoshis per byte
   }
 
@@ -315,6 +317,85 @@ class BCHService {
   // Convert BCH to satoshis
   toSats(bch) {
     return Math.round(bch * 100000000);
+  }
+
+  // Get tokens for an address (CashTokens)
+  async getTokens(address, retries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const utxos = await this.getUtxos(address);
+        const CashTokenUtils = require('../utils/cashtoken');
+        const tokens = [];
+
+        for (const utxo of utxos) {
+          const tokenData = CashTokenUtils.parseTokenOutput(utxo);
+          if (tokenData) {
+            tokenData.address = address;
+            tokens.push(tokenData);
+          }
+        }
+
+        return tokens;
+      } catch (error) {
+        lastError = error;
+        
+        const isRetryable = error.code === 'ECONNREFUSED' || 
+                           error.code === 'ETIMEDOUT' || 
+                           error.response?.status >= 500;
+        
+        if (!isRetryable || attempt === retries) {
+          logger.error(`Error getting tokens for ${address}:`, {
+            address,
+            attempt,
+            error: {
+              message: error.message,
+              code: error.code,
+              status: error.response?.status
+            }
+          });
+          throw new ExternalServiceError('BCH Service', `Failed to get tokens for ${address}: ${error.message}`, {
+            context: { address, attempts: attempt },
+            retryable: isRetryable
+          });
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+        logger.warn(`Token fetch retry ${attempt}/${retries} for ${address}`);
+      }
+    }
+    
+    throw lastError;
+  }
+
+  // Extract CashTokens from transaction
+  extractTokensFromTransaction(tx) {
+    try {
+      const CashTokenUtils = require('../utils/cashtoken');
+      return CashTokenUtils.extractTokensFromTransaction(tx);
+    } catch (error) {
+      logger.error('Error extracting tokens from transaction:', error);
+      return [];
+    }
+  }
+
+  // Check if transaction contains CashTokens
+  hasTokens(transaction) {
+    try {
+      if (!transaction || !transaction.vout) return false;
+      
+      const CashTokenUtils = require('../utils/cashtoken');
+      for (const output of transaction.vout) {
+        if (CashTokenUtils.parseTokenOutput(output)) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      logger.error('Error checking for tokens:', error);
+      return false;
+    }
   }
 }
 

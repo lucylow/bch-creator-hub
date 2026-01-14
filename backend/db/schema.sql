@@ -77,3 +77,30 @@ CREATE INDEX IF NOT EXISTS idx_withdraw_requests_status ON withdraw_requests(sta
 -- Add payout_address column to creators if it doesn't exist
 ALTER TABLE creators ADD COLUMN IF NOT EXISTS payout_address VARCHAR(64);
 
+-- CashTokens table for tracking CashToken NFTs and fungible tokens
+CREATE TABLE IF NOT EXISTS cash_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  creator_id CHAR(16) REFERENCES creators(creator_id) ON DELETE SET NULL,
+  category_id VARCHAR(80) NOT NULL,
+  token_id VARCHAR(80),
+  type VARCHAR(20) NOT NULL DEFAULT 'NFT', -- 'NFT' or 'FUNGIBLE'
+  owner_address VARCHAR(100) NOT NULL,
+  commitment TEXT,
+  metadata JSONB DEFAULT '{}',
+  status VARCHAR(20) DEFAULT 'active', -- 'active', 'pending_mint', 'spent'
+  txid VARCHAR(80),
+  output_index INT,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(category_id, token_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cash_tokens_owner ON cash_tokens(owner_address, status);
+CREATE INDEX IF NOT EXISTS idx_cash_tokens_category ON cash_tokens(category_id);
+CREATE INDEX IF NOT EXISTS idx_cash_tokens_creator ON cash_tokens(creator_id);
+CREATE INDEX IF NOT EXISTS idx_cash_tokens_txid ON cash_tokens(txid, output_index);
+CREATE INDEX IF NOT EXISTS idx_cash_tokens_status ON cash_tokens(status);
+
+-- Add token_category_id column to creators for subscription tokens
+ALTER TABLE creators ADD COLUMN IF NOT EXISTS token_category_id VARCHAR(80);
+

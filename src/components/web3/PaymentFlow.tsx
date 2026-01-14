@@ -3,13 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { usePayments } from '@/lib/web3/hooks/usePayments';
 import { useWallet } from '@/contexts/WalletContext';
 import { Send, Lock, Calendar, CheckCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import QRCode from 'react-qr-code';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatBCH, formatUSD, generatePaymentURI, truncateAddress } from '@/lib/web3/utils/bch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { QRCodeModal } from '@/components/Common/QRCodeDisplay';
 
 interface PaymentFlowProps {
   recipientAddress: string;
@@ -356,55 +356,15 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       </Card>
 
       {/* QR Code Modal */}
-      <AnimatePresence>
-        {showQR && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowQR(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              className="bg-background rounded-2xl p-8 max-w-sm w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold mb-2">Scan to Pay</h3>
-                <p className="text-muted-foreground">Use any BCH wallet to scan this code</p>
-              </div>
-              
-              <div className="p-4 bg-white rounded-xl mb-6">
-                <QRCode
-                  value={generatePaymentURI(recipientAddress, (parseFloat(amount) || 0) * 100000000)}
-                  size={200}
-                  level="H"
-                />
-              </div>
-              
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center font-bold mb-2">
-                    {formatBCH((parseFloat(amount) || 0) * 100000000)}
-                  </div>
-                  <p className="text-sm font-mono text-center break-all text-muted-foreground">
-                    {recipientAddress}
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Button
-                onClick={() => navigator.clipboard.writeText(generatePaymentURI(recipientAddress, (parseFloat(amount) || 0) * 100000000))}
-                className="w-full mt-6 bg-gradient-primary"
-              >
-                Copy Payment URI
-              </Button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <QRCodeModal
+        open={showQR}
+        onOpenChange={setShowQR}
+        value={generatePaymentURI(recipientAddress, (parseFloat(amount) || 0) * 100000000, metadata.recipientName || '', memo)}
+        title="Scan to Pay"
+        description={`Pay ${formatBCH((parseFloat(amount) || 0) * 100000000)} to ${truncateAddress(recipientAddress)}`}
+        size={256}
+        level="H"
+      />
     </div>
   );
 };

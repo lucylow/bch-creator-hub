@@ -1,10 +1,12 @@
 const PaymentIntent = require('../models/PaymentIntent');
 const Transaction = require('../models/Transaction');
+const PaymentService = require('../services/payment.service');
 const { validationResult } = require('express-validator');
 const { generateRandomId } = require('../utils/generators');
 const logger = require('../utils/logger');
 const { ValidationError, NotFoundError, ConflictError, AppError } = require('../utils/errors');
 const MicropaymentService = require('../services/micropayment.service');
+const QRCodeUtil = require('../utils/qrcode.util');
 const { MICROPAYMENT } = require('../config/constants');
 
 class PaymentController {
@@ -31,34 +33,8 @@ class PaymentController {
         expiresInHours
       } = req.body;
 
-      // Validate micro-payment amount (dust limit check)
-      if (amountSats) {
-        const validation = MicropaymentService.validateAmount(amountSats);
-        if (!validation.valid) {
-          throw new ValidationError(validation.error, [{ msg: validation.error, param: 'amountSats' }]);
-        }
-
-        // Add micro-payment metadata
-        if (MicropaymentService.isMicropayment(amountSats)) {
-          metadata.isMicropayment = true;
-          metadata.shouldBatch = MicropaymentService.shouldBatch(amountSats);
-          
-          // Calculate fee efficiency
-          const BCHService = require('../services/bch.service');
-          const feeEstimate = BCHService.estimateFee();
-          const efficiency = MicropaymentService.analyzePaymentEfficiency(amountSats, feeEstimate.sats);
-          metadata.feeEfficiency = efficiency;
-        }
-      }
-
-      // Calculate expiration
-      let expiresAt = null;
-      if (expiresInHours) {
-        expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + expiresInHours);
-      }
-
-      const paymentIntent = await PaymentIntent.create({
+      // Use unified payment service
+      const paymentIntent = await PaymentService.createPaymentIntent({
         creatorId,
         intentType: type,
         amountSats,
@@ -70,18 +46,26 @@ class PaymentController {
         metadata,
         isRecurring,
         recurrenceInterval,
-        expiresAt
+        expiresInHours
       });
 
-      // Generate payment URL
-      const paymentUrl = `${process.env.FRONTEND_URL}/pay/${creatorId}/${paymentIntent.intent_id}`;
+      // Generate QR code server-side
+      let qrCodeUrl = paymentIntent.qrCodeUrl;
+      try {
+        qrCodeUrl = await QRCodeUtil.generatePaymentQR(paymentIntent.paymentUrl, {
+          size: 256,
+          errorCorrectionLevel: 'M'
+        });
+      } catch (error) {
+        logger.warn('Failed to generate QR code for payment intent', { error: error.message, intentId: paymentIntent.intent_id });
+        // Continue with fallback QR code if generation fails
+      }
 
       res.status(201).json({
         success: true,
         data: {
           ...paymentIntent,
-          paymentUrl,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentUrl)}`
+          qrCodeUrl
         }
       });
     } catch (error) {
@@ -192,56 +176,16 @@ class PaymentController {
 
       const creatorId = req.creator.creator_id;
 
-      // Get payment intent
-      const paymentIntent = await PaymentIntent.findById(paymentId);
-      if (!paymentIntent) {
-        throw new NotFoundError('Payment intent');
-      }
-      if (paymentIntent.creator_id !== creatorId) {
-        throw new AppError('Not authorized to record payment for this intent', 403);
-      }
-
-      // Validate micro-payment amount
-      const validation = MicropaymentService.validateAmount(amountSats);
-      if (!validation.valid) {
-        throw new ValidationError(validation.error, [{ msg: validation.error, param: 'amountSats' }]);
-      }
-
-      // Check if transaction already exists
-      const existingTx = await Transaction.findByTxid(txid);
-      if (existingTx) {
-        throw new ConflictError('Transaction already recorded');
-      }
-
-      // Calculate fee for transaction
-      const BCHService = require('../services/bch.service');
-      const feeEstimate = BCHService.estimateFee();
-
-      // Create transaction record
-      const transaction = await Transaction.create({
+      // Use unified payment service
+      const transaction = await PaymentService.processPayment({
         txid,
+        paymentId,
         creatorId,
-        paymentIntentId: paymentIntent.id,
-        intentId: paymentIntent.intent_id,
         amountSats,
-        feeSats: feeEstimate.sats,
         senderAddress,
         receiverAddress: req.creator.contract_address,
-        paymentType: paymentIntent.intent_type,
-        contentId: paymentIntent.content_id,
-        payloadJson: metadata,
-        isConfirmed: false,
-        metadata: {
-          recordedVia: 'frontend',
-          isMicropayment: MicropaymentService.isMicropayment(amountSats),
-          feeEfficiency: MicropaymentService.analyzePaymentEfficiency(amountSats, feeEstimate.sats),
-          ...metadata
-        }
+        metadata
       });
-
-      // Update creator balance cache
-      const redis = require('../config/redis');
-      await redis.del(`creator:${creatorId}:balance`);
 
       res.status(201).json({
         success: true,
@@ -291,18 +235,87 @@ class PaymentController {
 
       const paymentUrl = `${process.env.FRONTEND_URL}/pay/${creatorId}/${paymentIntent.intent_id}`;
 
+      // Generate QR code server-side
+      let qrCode = null;
+      try {
+        qrCode = await QRCodeUtil.generatePaymentQR(paymentUrl, {
+          size: 256,
+          errorCorrectionLevel: 'M'
+        });
+      } catch (error) {
+        logger.warn('Failed to generate QR code for payment link', { error: error.message, intentId: paymentIntent.intent_id });
+        // Continue without QR code if generation fails
+      }
+
       res.json({
         success: true,
         data: {
           paymentUrl,
           intentId: paymentIntent.intent_id,
-          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentUrl)}`,
+          qrCode,
           micropaymentInfo: amountSats && MicropaymentService.isMicropayment(amountSats) ? {
             isMicropayment: true,
             shouldBatch: MicropaymentService.shouldBatch(amountSats),
             efficiency: metadata.feeEfficiency
           } : null
         }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get payment status
+  async getPaymentStatus(req, res, next) {
+    try {
+      const { txid } = req.params;
+      const status = await PaymentService.getPaymentStatus(txid);
+
+      res.json({
+        success: true,
+        data: status
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Estimate payment fee
+  async estimateFee(req, res, next) {
+    try {
+      const { numInputs, numOutputs, priority, amountSats } = req.query;
+      
+      const feeEstimate = await PaymentService.estimateFee({
+        numInputs: numInputs ? parseInt(numInputs) : undefined,
+        numOutputs: numOutputs ? parseInt(numOutputs) : undefined,
+        priority,
+        amountSats: amountSats ? parseInt(amountSats) : undefined
+      });
+
+      res.json({
+        success: true,
+        data: feeEstimate
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get payment stats
+  async getPaymentStats(req, res, next) {
+    try {
+      const creatorId = req.creator.creator_id;
+      const { startDate, endDate } = req.query;
+
+      const stats = await PaymentService.getPaymentStats(
+        creatorId,
+        startDate ? new Date(startDate) : null,
+        endDate ? new Date(endDate) : null
+      );
+
+      res.json({
+        success: true,
+        data: stats
       });
     } catch (error) {
       next(error);

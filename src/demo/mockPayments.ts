@@ -13,6 +13,7 @@ export type MockPayment = {
   amount: number; // sats
   contentId: string;
   timestamp: string;
+  source?: 'twitter' | 'article' | 'youtube' | 'general'; // Platform/source identifier
   feeSplit: {
     creator: number;
     platform: number;
@@ -212,6 +213,204 @@ export const MOCK_PAYMENTS: MockPayment[] = [
       platform: 900,
     },
   },
+  // Twitter Tips
+  {
+    txid: "pay_twitter_001",
+    from: ADDRESSES.userLucy,
+    to: ADDRESSES.creatorAlice,
+    amount: 10000, // 0.0001 BCH
+    contentId: "twitter_tip_thread_001",
+    timestamp: "2026-01-06T14:20:00Z",
+    source: 'twitter',
+    feeSplit: {
+      creator: 9900,
+      platform: 100,
+    },
+  },
+  {
+    txid: "pay_twitter_002",
+    from: ADDRESSES.userJudge,
+    to: ADDRESSES.creatorBob,
+    amount: 5000,
+    contentId: "twitter_tip_post_002",
+    timestamp: "2026-01-06T15:45:00Z",
+    source: 'twitter',
+    feeSplit: {
+      creator: 4950,
+      platform: 50,
+    },
+  },
+  {
+    txid: "pay_twitter_003",
+    from: ADDRESSES.userMark,
+    to: ADDRESSES.creatorAlice,
+    amount: 20000,
+    contentId: "twitter_tip_thread_003",
+    timestamp: "2026-01-06T16:30:00Z",
+    source: 'twitter',
+    feeSplit: {
+      creator: 19800,
+      platform: 200,
+    },
+  },
+  {
+    txid: "pay_twitter_004",
+    from: ADDRESSES.userNina,
+    to: ADDRESSES.creatorBob,
+    amount: 15000,
+    contentId: "twitter_tip_reply_004",
+    timestamp: "2026-01-06T17:15:00Z",
+    source: 'twitter',
+    feeSplit: {
+      creator: 14850,
+      platform: 150,
+    },
+  },
+  {
+    txid: "pay_twitter_005",
+    from: ADDRESSES.userLucy,
+    to: ADDRESSES.creatorAlice,
+    amount: 8000,
+    contentId: "twitter_tip_space_005",
+    timestamp: "2026-01-06T18:00:00Z",
+    source: 'twitter',
+    feeSplit: {
+      creator: 7920,
+      platform: 80,
+    },
+  },
+  // Article Unlocks
+  {
+    txid: "pay_article_001",
+    from: ADDRESSES.userJudge,
+    to: ADDRESSES.creatorAlice,
+    amount: 5000, // 0.00005 BCH
+    contentId: "article_bch_scaling_solutions",
+    timestamp: "2026-01-06T10:30:00Z",
+    source: 'article',
+    feeSplit: {
+      creator: 4950,
+      platform: 50,
+    },
+  },
+  {
+    txid: "pay_article_002",
+    from: ADDRESSES.userMark,
+    to: ADDRESSES.creatorBob,
+    amount: 10000,
+    contentId: "article_defi_on_bch",
+    timestamp: "2026-01-06T11:15:00Z",
+    source: 'article',
+    feeSplit: {
+      creator: 9900,
+      platform: 100,
+    },
+  },
+  {
+    txid: "pay_article_003",
+    from: ADDRESSES.userNina,
+    to: ADDRESSES.creatorAlice,
+    amount: 7500,
+    contentId: "article_cashtokens_guide",
+    timestamp: "2026-01-06T12:00:00Z",
+    source: 'article',
+    feeSplit: {
+      creator: 7425,
+      platform: 75,
+    },
+  },
+  {
+    txid: "pay_article_004",
+    from: ADDRESSES.userLucy,
+    to: ADDRESSES.creatorBob,
+    amount: 15000,
+    contentId: "article_nft_marketplace_tutorial",
+    timestamp: "2026-01-06T13:20:00Z",
+    source: 'article',
+    feeSplit: {
+      creator: 14850,
+      platform: 150,
+    },
+  },
+  {
+    txid: "pay_article_005",
+    from: ADDRESSES.userJudge,
+    to: ADDRESSES.creatorAlice,
+    amount: 25000,
+    contentId: "article_smart_contracts_bch",
+    timestamp: "2026-01-06T14:45:00Z",
+    source: 'article',
+    feeSplit: {
+      creator: 24750,
+      platform: 250,
+    },
+  },
+  // YouTube Superchats
+  {
+    txid: "pay_youtube_001",
+    from: ADDRESSES.userMark,
+    to: ADDRESSES.creatorAlice,
+    amount: 20000, // 0.0002 BCH
+    contentId: "youtube_livestream_001",
+    timestamp: "2026-01-06T19:00:00Z",
+    source: 'youtube',
+    feeSplit: {
+      creator: 19800,
+      platform: 200,
+    },
+  },
+  {
+    txid: "pay_youtube_002",
+    from: ADDRESSES.userNina,
+    to: ADDRESSES.creatorBob,
+    amount: 30000,
+    contentId: "youtube_video_comment_002",
+    timestamp: "2026-01-06T20:15:00Z",
+    source: 'youtube',
+    feeSplit: {
+      creator: 29700,
+      platform: 300,
+    },
+  },
+  {
+    txid: "pay_youtube_003",
+    from: ADDRESSES.userLucy,
+    to: ADDRESSES.creatorAlice,
+    amount: 50000,
+    contentId: "youtube_livestream_003",
+    timestamp: "2026-01-06T21:30:00Z",
+    source: 'youtube',
+    feeSplit: {
+      creator: 49500,
+      platform: 500,
+    },
+  },
+  {
+    txid: "pay_youtube_004",
+    from: ADDRESSES.userJudge,
+    to: ADDRESSES.creatorBob,
+    amount: 15000,
+    contentId: "youtube_superchat_004",
+    timestamp: "2026-01-06T22:00:00Z",
+    source: 'youtube',
+    feeSplit: {
+      creator: 14850,
+      platform: 150,
+    },
+  },
+  {
+    txid: "pay_youtube_005",
+    from: ADDRESSES.userMark,
+    to: ADDRESSES.creatorAlice,
+    amount: 40000,
+    contentId: "youtube_premiere_chat_005",
+    timestamp: "2026-01-06T23:15:00Z",
+    source: 'youtube',
+    feeSplit: {
+      creator: 39600,
+      platform: 400,
+    },
+  },
 ];
 
 /**
@@ -244,5 +443,33 @@ export function hasPaidForContent(address: string, contentId: string): boolean {
   return MOCK_PAYMENTS.some(
     p => p.from === address && p.contentId === contentId
   );
+}
+
+/**
+ * Get payments by source/platform
+ */
+export function getPaymentsBySource(source: 'twitter' | 'article' | 'youtube'): MockPayment[] {
+  return MOCK_PAYMENTS.filter(p => p.source === source);
+}
+
+/**
+ * Get Twitter tips for a creator
+ */
+export function getTwitterTipsForCreator(address: string): MockPayment[] {
+  return MOCK_PAYMENTS.filter(p => p.to === address && p.source === 'twitter');
+}
+
+/**
+ * Get Article unlocks for a creator
+ */
+export function getArticleUnlocksForCreator(address: string): MockPayment[] {
+  return MOCK_PAYMENTS.filter(p => p.to === address && p.source === 'article');
+}
+
+/**
+ * Get YouTube superchats for a creator
+ */
+export function getYouTubeSuperchatsForCreator(address: string): MockPayment[] {
+  return MOCK_PAYMENTS.filter(p => p.to === address && p.source === 'youtube');
 }
 

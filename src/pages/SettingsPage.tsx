@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Wallet, Bell, Shield, Palette, Save, Copy } from 'lucide-react';
+import { User, Wallet, Bell, Shield, Palette, Save, Copy, ArrowLeft, Home, BarChart2, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,10 +44,40 @@ const SettingsPage = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Link to="/dashboard">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Back to Dashboard
+              </Button>
+            </Link>
+          </div>
           <h1 className="text-3xl font-bold text-foreground">Settings</h1>
           <p className="text-muted-foreground">
             Manage your account and preferences
           </p>
+          
+          {/* Quick Navigation Links */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Link to="/dashboard">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Home className="w-4 h-4" />
+                Dashboard
+              </Button>
+            </Link>
+            <Link to="/analytics">
+              <Button variant="outline" size="sm" className="gap-2">
+                <BarChart2 className="w-4 h-4" />
+                Analytics
+              </Button>
+            </Link>
+            <Link to="/links">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Link2 className="w-4 h-4" />
+                Payment Links
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Tabs */}

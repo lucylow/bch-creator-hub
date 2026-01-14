@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, DollarSign, Users, Clock, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, Clock, BarChart3, ArrowLeft, Link2 } from 'lucide-react';
 import { formatBCH } from '@/utils/formatters';
+import { Button } from '@/components/ui/button';
 
 const AnalyticsPage = () => {
   const [period, setPeriod] = useState('30');
@@ -26,13 +28,21 @@ const AnalyticsPage = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  Dashboard
+                </Button>
+              </Link>
+            </div>
             <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
             <p className="text-muted-foreground">
               Track your earnings and performance
             </p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {[
               { value: '7', label: '7 days' },
               { value: '30', label: '30 days' },
@@ -50,6 +60,12 @@ const AnalyticsPage = () => {
                 {p.label}
               </button>
             ))}
+            <Link to="/links">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Link2 className="w-4 h-4" />
+                View Links
+              </Button>
+            </Link>
           </div>
         </div>
 

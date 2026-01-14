@@ -174,8 +174,8 @@ class ApiService {
   /**
    * Get dashboard stats
    */
-  async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
-    return this.request<DashboardStats>('/api/creators/dashboard');
+  async getDashboardStats(period: '7d' | '30d' | '90d' = '30d'): Promise<ApiResponse<DashboardStats>> {
+    return this.request<DashboardStats>(`/api/creators/dashboard?period=${period}`);
   }
 
   // ============ Payment Endpoints ============

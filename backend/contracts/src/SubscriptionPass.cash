@@ -256,25 +256,159 @@ contract SubscriptionPass {
     }
     
     // Helper functions for CashToken handling
+    // Note: CashScript doesn't have native CashToken parsing, so these work with script structure
+    // Actual token verification should be done off-chain before calling contract functions
+    
+    /**
+     * @notice Check if output has a specific token
+     * @dev In CashScript, we verify token structure by checking script format
+     * Actual token verification should be done off-chain
+     * @param output The output to check
+     * @param category Token category ID (20 bytes)
+     * @param tokenId Token ID for NFT (32 bytes)
+     * @param commitment Token commitment (expected length for subscription: 8 bytes)
+     */
     function hasToken(bytes output, bytes20 category, bytes32 tokenId, bytes commitment) returns (bool) {
-        // Implementation depends on CashToken library
-        // This is a placeholder for the actual CashToken verification
+        // CashToken format: OP_1 (0x51) + length + category (20 bytes) + tokenId (32 bytes) + commitment
+        // Minimum length: 1 (OP_1) + 1 (length) + 20 + 32 + commitment length
+        // For subscription NFTs, commitment is 8 bytes (expiration timestamp)
+        require(output.length >= 62 + commitment.length, "Output too short for token");
+        
+        // Check OP_1 prefix (0x51)
+        require(output[0] == 0x51, "Missing OP_1");
+        
+        // Extract category from expected position (after OP_1 and length byte)
+        // Position 2-21 should contain category
+        bytes20 extractedCategory = extractCategory(output);
+        require(extractedCategory == category, "Category mismatch");
+        
+        // Extract token ID (bytes 22-53)
+        bytes32 extractedTokenId = extractTokenId(output);
+        require(extractedTokenId == tokenId, "Token ID mismatch");
+        
+        // Extract commitment (last 8 bytes for subscription expiration)
+        bytes extractedCommitment = extractCommitment(output, commitment.length);
+        require(extractedCommitment == commitment, "Commitment mismatch");
+        
         return true;
     }
     
+    /**
+     * @notice Check if script contains any token of given category
+     * @param script The script to check
+     * @param category Token category ID
+     */
     function hasAnyToken(bytes script, bytes20 category) returns (bool) {
-        // Check if script contains any token of given category
-        return true;
+        // Minimum token-bearing script: OP_1 + length + category (20 bytes)
+        if (script.length < 22) {
+            return false;
+        }
+        
+        // Check OP_1 prefix
+        if (script[0] != 0x51) {
+            return false;
+        }
+        
+        // Extract and compare category
+        bytes20 extractedCategory = extractCategory(script);
+        return extractedCategory == category;
     }
     
+    /**
+     * @notice Extract token ID from token-bearing script
+     * @param script The script containing the token
+     * @return tokenId The 32-byte token ID
+     */
     function getTokenId(bytes script) returns (bytes32) {
-        // Extract token ID from script
-        return sha256(script);
+        require(script.length >= 54, "Script too short"); // OP_1 + length + category (20) + tokenId (32)
+        require(script[0] == 0x51, "Not a token-bearing script");
+        
+        // Token ID starts at byte 22 (after OP_1, length, and 20-byte category)
+        bytes32 tokenId;
+        
+        // Extract 32 bytes starting from position 22
+        for (int i = 0; i < 32; i++) {
+            tokenId[i] = script[22 + i];
+        }
+        
+        return tokenId;
     }
     
+    /**
+     * @notice Extract commitment from token-bearing script
+     * @param script The script containing the token
+     * @param commitmentLength Expected commitment length (8 bytes for subscription expiration)
+     * @return commitment The commitment bytes
+     */
     function getTokenCommitment(bytes script) returns (bytes) {
-        // Extract commitment from token-bearing script
-        return script[script.length - 8:];
+        // For subscription NFTs: OP_1 + length + category (20) + tokenId (32) + commitment (8)
+        // Commitment starts at byte 54
+        int commitmentLength = 8; // Standard for subscription expiration
+        
+        require(script.length >= 54 + commitmentLength, "Script too short for commitment");
+        
+        bytes memory commitment = new bytes(commitmentLength);
+        
+        for (int i = 0; i < commitmentLength; i++) {
+            commitment[i] = script[54 + i];
+        }
+        
+        return commitment;
+    }
+    
+    /**
+     * @notice Extract category ID from script
+     * @param script The token-bearing script
+     * @return category The 20-byte category ID
+     */
+    function extractCategory(bytes script) returns (bytes20) {
+        require(script.length >= 22, "Script too short for category");
+        require(script[0] == 0x51, "Not a token-bearing script");
+        
+        // Category is at bytes 2-21 (after OP_1 and length byte)
+        bytes20 category;
+        
+        for (int i = 0; i < 20; i++) {
+            category[i] = script[2 + i];
+        }
+        
+        return category;
+    }
+    
+    /**
+     * @notice Extract token ID from script
+     * @param script The token-bearing script
+     * @return tokenId The 32-byte token ID
+     */
+    function extractTokenId(bytes script) returns (bytes32) {
+        require(script.length >= 54, "Script too short for token ID");
+        
+        bytes32 tokenId;
+        
+        for (int i = 0; i < 32; i++) {
+            tokenId[i] = script[22 + i];
+        }
+        
+        return tokenId;
+    }
+    
+    /**
+     * @notice Extract commitment from script
+     * @param script The token-bearing script
+     * @param length The commitment length
+     * @return commitment The commitment bytes
+     */
+    function extractCommitment(bytes script, int length) returns (bytes) {
+        int startPos = 54; // After OP_1 + length + category (20) + tokenId (32)
+        require(script.length >= startPos + length, "Script too short for commitment");
+        
+        bytes memory commitment = new bytes(length);
+        
+        for (int i = 0; i < length; i++) {
+            commitment[i] = script[startPos + i];
+        }
+        
+        return commitment;
     }
     
     function extractPubKeyHash(bytes script) returns (bytes20) {

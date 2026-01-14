@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, CheckCircle, Copy, ExternalLink, Globe, Calendar, Zap } from 'lucide-react';
-import QRCode from 'react-qr-code';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { formatBCH, truncateAddress, bchToSats } from '@/utils/formatters';
@@ -10,6 +9,7 @@ import LoadingSpinner from '@/components/Common/LoadingSpinner';
 import PaymentForm from '@/components/Payment/PaymentForm';
 import WalletConnectModal from '@/components/Wallet/WalletConnectModal';
 import { useWallet } from '@/contexts/WalletContext';
+import QRCodeDisplay from '@/components/Common/QRCodeDisplay';
 
 const PaymentPage = () => {
   const { creatorId, paymentId } = useParams<{ creatorId?: string; paymentId?: string }>();
@@ -230,15 +230,19 @@ const PaymentPage = () => {
             </div>
 
             {/* QR Code */}
-            <div className="flex flex-col items-center p-6 rounded-xl bg-white">
-              <QRCode
-                value={`bitcoincash:${creatorInfo.address}?amount=${amount}`}
+            <div className="flex flex-col items-center p-6 rounded-xl bg-muted/50">
+              <QRCodeDisplay
+                value={creatorInfo.address.includes('bitcoincash:') 
+                  ? `${creatorInfo.address}${amount ? `?amount=${amount}` : ''}`
+                  : `bitcoincash:${creatorInfo.address}${amount ? `?amount=${amount}` : ''}`}
+                title="Scan to Pay"
+                description="Use any BCH wallet to scan this code"
                 size={200}
-                level="M"
+                level="H"
+                showDownload={true}
+                showCopy={true}
+                showShare={false}
               />
-              <p className="text-sm text-gray-500 mt-4">
-                Scan to pay from mobile wallet
-              </p>
             </div>
           </div>
 

@@ -25,4 +25,13 @@ router.post('/record', paymentLimiter, validateTransaction, paymentController.re
 // Generate payment link
 router.post('/link', paymentController.generatePaymentLink);
 
+// Get payment status (public)
+router.get('/status/:txid', paymentController.getPaymentStatus);
+
+// Estimate payment fee (public)
+router.get('/fee/estimate', paymentController.estimateFee);
+
+// Get payment stats (protected)
+router.get('/stats', paymentController.getPaymentStats);
+
 module.exports = router;

@@ -33,7 +33,7 @@ const PG_CONN = process.env.PG_CONN || process.env.DATABASE_URL || 'postgres://l
 const pool = new Pool({ connectionString: PG_CONN });
 
 // ZMQ configuration
-const ZMQ_URL = process.env.ZMQ_URL || 'tcp://127.0.0.1:28332';
+const ZMQ_URL = bchjsConfig.zmqUrl || process.env.ZMQ_URL || 'tcp://127.0.0.1:28332';
 const zmqSub = new zmq.Subscriber();
 
 // Event emitter for internal events

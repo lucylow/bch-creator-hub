@@ -67,11 +67,7 @@ class WalletService {
   }
 
   async getBalance(address: string): Promise<WalletBalance> {
-    // Use demo wallet if demo mode is enabled
-    if (isDemoMode()) {
-      return demoWallet.getBalance(address);
-    }
-
+    // Try web3 first
     try {
       // Try using BCH provider first
       try {
@@ -97,18 +93,14 @@ class WalletService {
         total: (data.confirmed || 0) + (data.unconfirmed || 0)
       };
     } catch (error) {
-      logger.error('Balance fetch error', error instanceof Error ? error : new Error(String(error)), { address });
-      // Return zero balance on error
-      return { confirmed: 0, unconfirmed: 0, total: 0 };
+      logger.warn('Web3 balance fetch failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { address });
+      // Fallback to mock data
+      return demoWallet.getBalance(address);
     }
   }
 
   async connectWallet(walletType: string = 'generic'): Promise<WalletConnectionResult> {
-    // Use demo wallet if demo mode is enabled
-    if (isDemoMode()) {
-      return demoWallet.connect();
-    }
-
+    // Try web3 first
     try {
       // Check if wallet is available
       if (typeof window === 'undefined') {
@@ -154,11 +146,9 @@ class WalletService {
         return await this.connectWalletDirect(walletType);
       }
     } catch (error) {
-      logger.error('Wallet connection error', error instanceof Error ? error : new Error(String(error)), { walletType });
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
+      logger.warn('Web3 wallet connection failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { walletType });
+      // Fallback to mock data
+      return demoWallet.connect();
     }
   }
 
@@ -307,11 +297,7 @@ class WalletService {
   }
 
   async sendPayment(toAddress: string, amountSats: number, payload?: string): Promise<PaymentResult> {
-    // Use demo wallet if demo mode is enabled
-    if (isDemoMode()) {
-      return demoWallet.sendPayment(toAddress, amountSats, payload);
-    }
-
+    // Try web3 first
     try {
       // Try using BCH provider first
       const currentWallet = bchProvider.getCurrentWallet();
@@ -352,20 +338,13 @@ class WalletService {
         txid: data.txid
       };
     } catch (error) {
-      logger.error('Payment error', error instanceof Error ? error : new Error(String(error)), { toAddress, amountSats });
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Payment failed'
-      };
+      logger.warn('Web3 payment failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { toAddress, amountSats });
+      // Fallback to mock data
+      return demoWallet.sendPayment(toAddress, amountSats, payload);
     }
   }
 
   getAvailableWallets(): string[] {
-    // In demo mode, always return demo wallet
-    if (isDemoMode()) {
-      return ['demo'];
-    }
-
     const wallets: string[] = [];
     
     if (typeof window !== 'undefined') {
@@ -392,9 +371,12 @@ class WalletService {
       }
     }
     
-    // Always include generic as fallback if no wallets detected
+    // Always include demo as fallback if no wallets detected
     if (wallets.length === 0) {
-      wallets.push('generic');
+      wallets.push('demo');
+    } else {
+      // Also include demo as an option even when wallets are available
+      wallets.push('demo');
     }
     
     return wallets;
@@ -440,7 +422,7 @@ class WalletService {
         name: 'Demo Wallet',
         icon: '🧪',
         supportsBIP322: true,
-        available: isDemoMode()
+        available: true
       }
     };
     

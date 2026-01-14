@@ -4,6 +4,7 @@ const BCHService = require('../services/bch.service');
 const Creator = require('../models/Creator');
 const Transaction = require('../models/Transaction');
 const NotificationService = require('../services/notification.service');
+const CashTokenService = require('../services/cashtoken.service');
 const logger = require('../utils/logger');
 
 class TransactionScanner {
@@ -103,6 +104,16 @@ class TransactionScanner {
     try {
       // Extract relevant information from transaction
       const { txid, payloads, vout, timestamp, blockHeight } = txData;
+      
+      // Check for CashToken transfers
+      const CashTokenService = require('../services/cashtoken.service');
+      if (BCHService.hasTokens(txData)) {
+        try {
+          await CashTokenService.processTokenTransfers(txData);
+        } catch (error) {
+          logger.error(`Error processing CashToken transfers in ${txid}:`, error);
+        }
+      }
       
       // Find outputs to contract addresses
       for (const output of vout) {

@@ -4,10 +4,11 @@ const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
 const { AppError, ExternalServiceError } = require('../utils/errors');
+const bchConfig = require('../config/bch');
 
 class ContractService {
   constructor() {
-    this.network = process.env.BCH_NETWORK || 'mainnet';
+    this.network = bchConfig.network;
     this.contractCache = new Map();
   }
 

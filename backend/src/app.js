@@ -16,6 +16,7 @@ const payloadRoutes = require('./routes/payload.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
 const withdrawalRoutes = require('./routes/withdrawal.routes');
 const contractWithdrawRoutes = require('./routes/contract-withdraw.routes');
+const cashtokenRoutes = require('./routes/cashtoken.routes');
 
 const errorHandler = require('./middleware/error.middleware');
 const { apiLimiter } = require('./middleware/auth.middleware');
@@ -89,6 +90,7 @@ class App {
     this.app.use('/api/subscriptions', subscriptionRoutes);
     this.app.use('/api/withdrawals', withdrawalRoutes);
     this.app.use('/api/contract', contractWithdrawRoutes);
+    this.app.use('/api/cashtokens', cashtokenRoutes);
     this.app.use('/api', payloadRoutes);
     
     // Bull Board for queue monitoring
@@ -109,6 +111,10 @@ class App {
   initializeJobs() {
     // Start transaction scanner
     TransactionScanner.init();
+    
+    // Start payment confirmation monitoring
+    const PaymentService = require('./services/payment.service');
+    PaymentService.startConfirmationMonitoring();
     
     // Other jobs can be initialized here
     require('./jobs/cleanup.job').init();

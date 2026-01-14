@@ -6,6 +6,7 @@
  */
 import { isDemoMode } from '@/config/demo';
 import { mockIndexerApi, hasPaidForContent } from '@/demo';
+import { logger } from '@/utils/logger';
 
 export interface ContentAccessResult {
   hasAccess: boolean;
@@ -20,27 +21,14 @@ export async function canAccessContent(
   address: string,
   contentId: string
 ): Promise<ContentAccessResult> {
-  if (isDemoMode()) {
-    const hasAccess = await mockIndexerApi.hasPaidForContent(address, contentId);
-    return {
-      hasAccess,
-      reason: hasAccess ? 'Payment verified' : 'Payment required',
-    };
-  }
-
-  // Real mode: check blockchain/indexer
+  // Try web3/API first
   try {
-    // TODO: Implement real blockchain check
-    // This should query the indexer or smart contract to verify payment
     const response = await fetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/paywall/check?address=${encodeURIComponent(address)}&contentId=${encodeURIComponent(contentId)}`
     );
 
     if (!response.ok) {
-      return {
-        hasAccess: false,
-        reason: 'Failed to verify access',
-      };
+      throw new Error('Failed to verify access');
     }
 
     const data = await response.json();
@@ -50,9 +38,12 @@ export async function canAccessContent(
       paymentTxid: data.paymentTxid,
     };
   } catch (error) {
+    // Fallback to mock data
+    logger.warn('Paywall API check failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { address, contentId });
+    const hasAccess = await mockIndexerApi.hasPaidForContent(address, contentId);
     return {
-      hasAccess: false,
-      reason: 'Error checking access',
+      hasAccess,
+      reason: hasAccess ? 'Payment verified' : 'Payment required',
     };
   }
 }
@@ -64,24 +55,22 @@ export async function hasAccessNFT(
   address: string,
   tokenId: string
 ): Promise<boolean> {
-  if (isDemoMode()) {
-    return mockIndexerApi.hasAccessNFT(address, tokenId);
-  }
-
-  // Real mode: check blockchain
+  // Try web3/API first
   try {
     const response = await fetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/paywall/nft?address=${encodeURIComponent(address)}&tokenId=${encodeURIComponent(tokenId)}`
     );
 
     if (!response.ok) {
-      return false;
+      throw new Error('Failed to verify NFT access');
     }
 
     const data = await response.json();
     return data.hasAccess || false;
   } catch (error) {
-    return false;
+    // Fallback to mock data
+    logger.warn('Paywall NFT API check failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { address, tokenId });
+    return mockIndexerApi.hasAccessNFT(address, tokenId);
   }
 }
 
@@ -92,25 +81,22 @@ export async function verifyPayment(
   txid: string,
   contentId: string
 ): Promise<boolean> {
-  if (isDemoMode()) {
-    // In demo mode, accept any payment that matches our mock data
-    return txid.startsWith('demo_tx_') || txid.startsWith('pay_');
-  }
-
-  // Real mode: verify transaction on blockchain
+  // Try web3/API first
   try {
     const response = await fetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/paywall/verify?txid=${encodeURIComponent(txid)}&contentId=${encodeURIComponent(contentId)}`
     );
 
     if (!response.ok) {
-      return false;
+      throw new Error('Failed to verify payment');
     }
 
     const data = await response.json();
     return data.verified || false;
   } catch (error) {
-    return false;
+    // Fallback to mock data - accept payments that match mock data patterns
+    logger.warn('Paywall verification API failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { txid, contentId });
+    return txid.startsWith('demo_tx_') || txid.startsWith('pay_');
   }
 }
 

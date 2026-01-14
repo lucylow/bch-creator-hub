@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatBCH } from '@/utils/formatters';
+import { QRCodeModal } from '@/components/Common/QRCodeDisplay';
 
 interface PaymentLink {
   id: string;
@@ -43,6 +44,8 @@ const typeColors = {
 const PaymentLinksPage = () => {
   const [links] = useState<PaymentLink[]>(mockLinks);
   const [search, setSearch] = useState('');
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [selectedLink, setSelectedLink] = useState<PaymentLink | null>(null);
 
   const filteredLinks = links.filter(link => 
     link.title.toLowerCase().includes(search.toLowerCase())
@@ -51,6 +54,11 @@ const PaymentLinksPage = () => {
   const copyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     toast.success('Link copied to clipboard!');
+  };
+
+  const showQRCode = (link: PaymentLink) => {
+    setSelectedLink(link);
+    setQrModalOpen(true);
   };
 
   return (
@@ -126,7 +134,12 @@ const PaymentLinksPage = () => {
                     <Copy className="w-4 h-4" />
                     Copy
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => showQRCode(link)}
+                  >
                     <QrCode className="w-4 h-4" />
                     QR
                   </Button>
@@ -157,6 +170,19 @@ const PaymentLinksPage = () => {
           </div>
         )}
       </div>
+
+      {/* QR Code Modal */}
+      {selectedLink && (
+        <QRCodeModal
+          open={qrModalOpen}
+          onOpenChange={setQrModalOpen}
+          value={selectedLink.url}
+          title={selectedLink.title}
+          description={selectedLink.description}
+          size={256}
+          level="M"
+        />
+      )}
     </div>
   );
 };
