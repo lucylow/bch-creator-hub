@@ -74,3 +74,4 @@ export function hasVoted(proposalId: string, voter: string): boolean {
   );
 }
 
+

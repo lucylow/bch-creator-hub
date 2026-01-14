@@ -63,3 +63,4 @@ class ContractDeployerJob {
 }
 
 module.exports = new ContractDeployerJob();
+

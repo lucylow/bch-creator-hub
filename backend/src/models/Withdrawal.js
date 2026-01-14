@@ -109,3 +109,4 @@ class Withdrawal {
 }
 
 module.exports = Withdrawal;
+

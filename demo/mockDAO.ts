@@ -82,3 +82,4 @@ export function getActiveProposals(): MockProposal[] {
   return MOCK_PROPOSALS.filter(p => p.status === "active");
 }
 
+

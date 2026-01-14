@@ -93,3 +93,4 @@ class BusinessMetric {
 }
 
 module.exports = BusinessMetric;
+

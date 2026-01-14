@@ -178,3 +178,4 @@ export const MOCK_PAYMENTS: MockPayment[] = [
 - Transaction IDs are deterministic for demo purposes
 - Mock data is read-only (doesn't mutate state)
 
+

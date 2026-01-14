@@ -144,3 +144,4 @@ class PaymentIntent {
 }
 
 module.exports = PaymentIntent;
+

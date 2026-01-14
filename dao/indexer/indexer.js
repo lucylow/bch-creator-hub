@@ -172,3 +172,4 @@ if (require.main === module) {
 
 module.exports = { loadProposals, saveProposals, proposals };
 
+

@@ -109,3 +109,4 @@ export function switchDemoWallet(address: string): void {
   demoWallet.address = address;
 }
 
+

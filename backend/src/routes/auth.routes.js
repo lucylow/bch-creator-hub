@@ -14,3 +14,4 @@ router.get('/challenge', apiLimiter, authController.getChallenge);
 router.get('/verify', verifyToken, authController.verify);
 
 module.exports = router;
+

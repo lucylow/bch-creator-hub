@@ -39,3 +39,4 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, Ownable {
     }
 }
 
+

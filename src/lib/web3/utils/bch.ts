@@ -68,3 +68,4 @@ export const parseTransaction = (tx: any) => {
     fee: tx.fees || 0
   };
 };
+

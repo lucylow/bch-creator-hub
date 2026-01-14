@@ -228,3 +228,4 @@ VITE_BCH_NETWORK=testnet
 ## License
 
 This integration follows the same license as the main project.
+

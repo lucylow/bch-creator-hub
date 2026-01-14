@@ -254,3 +254,4 @@ The payload encoder/decoder tests are in `backend/tests/unit/payload.test.js`.
 - Add comprehensive error handling and monitoring
 - Set up alerts for reorgs and indexer issues
 
+

@@ -95,3 +95,4 @@ export function getBalanceForAddress(address: string): number {
   return getUTXOsForAddress(address).reduce((sum, utxo) => sum + utxo.value, 0);
 }
 
+

@@ -20,3 +20,4 @@ router.get('/analytics/earnings', analyticsController.getEarningsChart);
 router.get('/analytics/supporters', analyticsController.getTopSupporters);
 
 module.exports = router;
+

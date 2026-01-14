@@ -37,3 +37,4 @@ router.post('/renew', subscriptionController.renewSubscription);
 router.get('/features/:feature', subscriptionController.checkFeature);
 
 module.exports = router;
+

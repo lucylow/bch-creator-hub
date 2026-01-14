@@ -86,3 +86,4 @@ uploadImageAndMetadata(imagePath, name, description, attributes)
     process.exit(1);
   });
 
+

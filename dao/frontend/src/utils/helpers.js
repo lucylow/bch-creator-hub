@@ -19,3 +19,4 @@ export function descriptionHash(description) {
   return ethers.utils.id(description);
 }
 
+

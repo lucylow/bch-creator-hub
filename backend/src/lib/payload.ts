@@ -41,3 +41,4 @@ export function decodePayload(payload: Buffer): ParsedPayload | null {
   const metadata = payload.length > 14 ? payload.slice(14) : undefined;
   return { version, creatorId, paymentType, contentId, metadata };
 }
+
