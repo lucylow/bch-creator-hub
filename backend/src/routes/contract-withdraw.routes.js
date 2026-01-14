@@ -50,7 +50,10 @@ router.post('/withdraw/:creatorId/skeleton', async (req, res) => {
 
   try {
     // Verify the creator ID matches the authenticated user
-    if (req.creator && req.creator.creator_id !== creatorId) {
+    if (!req.creator) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    if (req.creator.creator_id !== creatorId) {
       return res.status(403).json({ error: 'Unauthorized: creator ID mismatch' });
     }
 
