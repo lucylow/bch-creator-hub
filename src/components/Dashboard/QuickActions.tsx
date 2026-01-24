@@ -1,18 +1,75 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Download, Share2, BarChart3, Settings, Link2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Plus, Download, Share2, BarChart3, Settings, Link2, Wallet, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useCreator } from '@/contexts/CreatorContext';
+import { cn } from '@/lib/utils';
 
 type Props = { creatorAddress?: string };
 
+interface QuickActionButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  to?: string;
+  variant?: 'primary' | 'secondary' | 'outline';
+  delay?: number;
+}
+
+const QuickActionButton: React.FC<QuickActionButtonProps> = ({ 
+  icon, 
+  label, 
+  onClick, 
+  to,
+  variant = 'outline',
+  delay = 0
+}) => {
+  const baseClasses = cn(
+    'w-full flex items-center justify-start gap-3 px-4 py-3 rounded-xl',
+    'transition-all duration-200 group',
+    variant === 'primary' && 'bg-gradient-primary text-primary-foreground shadow-md hover:shadow-lg hover:opacity-95',
+    variant === 'secondary' && 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15',
+    variant === 'outline' && 'bg-card hover:bg-muted/50 border border-border/50 hover:border-primary/30 text-foreground'
+  );
+
+  const content = (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: delay * 0.05 }}
+      className={baseClasses}
+    >
+      <div className={cn(
+        'w-9 h-9 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110',
+        variant === 'primary' && 'bg-white/20',
+        variant === 'secondary' && 'bg-primary/10',
+        variant === 'outline' && 'bg-muted/50'
+      )}>
+        {icon}
+      </div>
+      <span className="font-medium">{label}</span>
+      <ArrowUpRight className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+    </motion.div>
+  );
+
+  if (to) {
+    return <Link to={to} className="block hover-lift">{content}</Link>;
+  }
+
+  return (
+    <button onClick={onClick} className="w-full hover-lift">
+      {content}
+    </button>
+  );
+};
+
 const QuickActions: React.FC<Props> = ({ creatorAddress }) => {
   const { creator } = useCreator();
-  const address = creatorAddress || creator?.address || '';
 
   const handleExport = () => {
-    toast.success('Export queued. We emailed the CSV to you.');
+    toast.success('Export queued. Check your email shortly.');
   };
 
   const handleShare = async () => {
@@ -20,77 +77,75 @@ const QuickActions: React.FC<Props> = ({ creatorAddress }) => {
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Support me', url });
-      } catch (e) {
+      } catch {
         navigator.clipboard.writeText(url);
-        toast.success('Payment link copied to clipboard');
+        toast.success('Payment link copied!');
       }
     } else {
       navigator.clipboard.writeText(url);
-      toast.success('Payment link copied to clipboard');
+      toast.success('Payment link copied!');
     }
   };
 
   return (
-    <div className="glass-card rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-foreground">Quick Actions</h3>
+    <div className="glass-card-elevated rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-foreground">Quick Actions</h3>
       </div>
 
-      <div className="grid grid-cols-1 gap-3">
-        <Link to="/links/new" className="w-full">
-          <Button className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" />
-            Create Payment Link
-          </Button>
-        </Link>
+      <div className="space-y-2">
+        <QuickActionButton
+          icon={<Plus className="w-4 h-4" />}
+          label="Create Payment Link"
+          to="/links/new"
+          variant="primary"
+          delay={0}
+        />
 
-        <Link to="/links" className="w-full">
-          <Button 
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2 hover:bg-muted/50"
-          >
-            <Link2 className="w-4 h-4" />
-            View All Links
-          </Button>
-        </Link>
+        <QuickActionButton
+          icon={<Wallet className="w-4 h-4 text-primary" />}
+          label="Withdraw Funds"
+          to="/withdrawals"
+          variant="secondary"
+          delay={1}
+        />
 
-        <Link to="/analytics" className="w-full">
-          <Button 
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2 hover:bg-muted/50"
-          >
-            <BarChart3 className="w-4 h-4" />
-            View Analytics
-          </Button>
-        </Link>
+        <div className="h-px bg-border/50 my-3" />
 
-        <Button 
-          onClick={handleExport} 
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2 hover:bg-muted/50"
-        >
-          <Download className="w-4 h-4" />
-          Export CSV
-        </Button>
+        <QuickActionButton
+          icon={<Link2 className="w-4 h-4 text-muted-foreground" />}
+          label="Manage Links"
+          to="/links"
+          delay={2}
+        />
 
-        <Button 
-          onClick={handleShare} 
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2 hover:bg-muted/50"
-        >
-          <Share2 className="w-4 h-4" />
-          Share Payment Link
-        </Button>
+        <QuickActionButton
+          icon={<BarChart3 className="w-4 h-4 text-muted-foreground" />}
+          label="Analytics"
+          to="/analytics"
+          delay={3}
+        />
 
-        <Link to="/settings" className="w-full">
-          <Button 
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2 hover:bg-muted/50"
-          >
-            <Settings className="w-4 h-4" />
-            Settings
-          </Button>
-        </Link>
+        <QuickActionButton
+          icon={<Share2 className="w-4 h-4 text-muted-foreground" />}
+          label="Share Payment Link"
+          onClick={handleShare}
+          delay={4}
+        />
+
+        <QuickActionButton
+          icon={<Download className="w-4 h-4 text-muted-foreground" />}
+          label="Export Data"
+          onClick={handleExport}
+          delay={5}
+        />
+
+        <QuickActionButton
+          icon={<Settings className="w-4 h-4 text-muted-foreground" />}
+          label="Settings"
+          to="/settings"
+          delay={6}
+        />
       </div>
     </div>
   );
