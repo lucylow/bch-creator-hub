@@ -47,13 +47,13 @@ export const usePayments = () => {
         throw new Error('Payment intent not found');
       }
 
-      const intent = intentRes.data;
+      const intent = intentRes.data as { contractAddress?: string; creatorAddress?: string; contentId?: string };
       
       // Send payment to creator's contract
-      const result = await sendPayment(intent.contractAddress || intent.creatorAddress, amountSatoshis, JSON.stringify({
+      const result = await sendPayment(intent.contractAddress || intent.creatorAddress || '', amountSatoshis, JSON.stringify({
         type: 'content_unlock',
         intentId: paymentIntentId,
-        contentId: intent.contentId,
+        contentId: intent.contentId || '',
         timestamp: Date.now()
       }));
 

@@ -63,7 +63,7 @@ export default function MintForm() {
         abi: NFT_ABI,
         functionName: 'mint',
         args: [address, tokenURI],
-      });
+      } as any);
     } catch (err) {
       console.error('Mint error:', err);
       toast.error('Failed to mint NFT');

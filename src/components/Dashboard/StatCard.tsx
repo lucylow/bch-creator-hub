@@ -7,7 +7,7 @@ type Props = {
   value: string | number;
   subValue?: string;
   icon?: React.ReactNode;
-  trend?: string | null;
+  trend?: React.ReactNode;
   color?: 'primary' | 'green' | 'blue' | 'purple' | 'orange' | 'red';
 };
 

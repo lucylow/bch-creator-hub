@@ -101,7 +101,7 @@ export default function BuyNFT() {
         functionName: 'redeem',
         args: [voucher, signature as `0x${string}`],
         value: parseEther(price),
-      });
+      } as any);
     } catch (err) {
       console.error('Redeem error:', err);
       toast.error('Failed to redeem voucher');

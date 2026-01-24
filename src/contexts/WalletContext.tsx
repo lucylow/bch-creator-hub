@@ -264,7 +264,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       bchProvider.disconnect();
     } catch (error) {
       // Provider disconnect may fail, ignore
-      logger.warn('BCH provider disconnect error', error instanceof Error ? error : new Error(String(error)));
+      logger.warn('BCH provider disconnect error', { message: error instanceof Error ? error.message : String(error) });
     }
     
     toast.success('Wallet disconnected');
