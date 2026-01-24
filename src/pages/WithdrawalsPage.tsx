@@ -1,21 +1,27 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, RefreshCw, ArrowUpRight, Clock, CheckCircle, XCircle, Wallet } from 'lucide-react';
+import { 
+  ArrowLeft, Download, RefreshCw, ArrowUpRight, Clock, 
+  CheckCircle, XCircle, Wallet, TrendingUp, ExternalLink,
+  ChevronRight, Sparkles
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
+import StatusBadge from '@/components/Common/StatusBadge';
+import LiveIndicator from '@/components/Common/LiveIndicator';
 import { apiService } from '@/services/api';
 import { formatBCH, formatDate, truncateAddress } from '@/utils/formatters';
 import { useCreator } from '@/contexts/CreatorContext';
+import { cn } from '@/lib/utils';
 
 const WithdrawalsPage = () => {
   const { creator } = useCreator();
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  // Fetch withdrawals with React Query
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['withdrawals'],
     queryFn: async () => {
@@ -39,30 +45,14 @@ const WithdrawalsPage = () => {
     .reduce((sum: number, w: any) => sum + (w.amountSats || 0), 0);
 
   const pendingWithdrawals = withdrawals.filter((w: any) => w.status === 'pending');
+  const pendingAmount = pendingWithdrawals.reduce((sum: number, w: any) => sum + (w.amountSats || 0), 0);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusType = (status: string): 'success' | 'pending' | 'failed' => {
     switch (status) {
-      case 'confirmed':
-        return <CheckCircle className="w-5 h-5 text-green-400" />;
-      case 'pending':
-        return <Clock className="w-5 h-5 text-yellow-400" />;
-      case 'failed':
-        return <XCircle className="w-5 h-5 text-red-400" />;
-      default:
-        return <Clock className="w-5 h-5 text-muted-foreground" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-500/10 text-green-400 border-green-500/20';
-      case 'pending':
-        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-      case 'failed':
-        return 'bg-red-500/10 text-red-400 border-red-500/20';
-      default:
-        return 'bg-muted/50 text-muted-foreground border-border';
+      case 'confirmed': return 'success';
+      case 'pending': return 'pending';
+      case 'failed': return 'failed';
+      default: return 'pending';
     }
   };
 
@@ -71,50 +61,54 @@ const WithdrawalsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pt-24 pb-12 px-4 sm:px-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pt-24 pb-12 px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto">
+        {/* Header with breadcrumb */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
+          className="mb-8"
         >
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  Dashboard
+          <Link 
+            to="/dashboard" 
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Back to Dashboard</span>
+          </Link>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-1">Withdrawals</h1>
+              <p className="text-muted-foreground flex items-center gap-2">
+                Manage your BCH withdrawals
+                <LiveIndicator isLive={pendingWithdrawals.length > 0} label={pendingWithdrawals.length > 0 ? 'Processing' : ''} size="sm" />
+              </p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+                className="gap-2 hover-lift"
+              >
+                <RefreshCw className={cn('w-4 h-4', isRefetching && 'animate-spin')} />
+                Refresh
+              </Button>
+              <Link to="/settings">
+                <Button size="sm" className="bg-gradient-primary hover:opacity-90 text-primary-foreground gap-2 hover-lift glow-effect">
+                  <Wallet className="w-4 h-4" />
+                  Withdraw
                 </Button>
               </Link>
             </div>
-            <h1 className="text-4xl font-bold text-foreground mb-2">Withdrawals</h1>
-            <p className="text-muted-foreground text-lg">
-              View and manage your withdrawal history
-            </p>
-          </div>
-          
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => refetch()}
-              disabled={isRefetching}
-              className="gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Link to="/settings">
-              <Button className="bg-gradient-primary hover:opacity-90 text-primary-foreground gap-2">
-                <Wallet className="w-4 h-4" />
-                New Withdrawal
-              </Button>
-            </Link>
           </div>
         </motion.div>
 
         {error && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mb-6 animate-fade-in">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               {error instanceof Error ? error.message : 'Failed to load withdrawals'}
@@ -122,71 +116,96 @@ const WithdrawalsPage = () => {
           </Alert>
         )}
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Summary Cards - Cleaner design */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* Total Withdrawn */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="glass-card rounded-xl p-6 border-border/50"
+            className="glass-card-elevated rounded-2xl p-6 hover-lift group"
           >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Total Withdrawn</p>
-              <ArrowUpRight className="w-5 h-5 text-primary" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <TrendingUp className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">All Time</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{formatBCH(totalWithdrawn)}</p>
-            <p className="text-xs text-muted-foreground mt-2">All confirmed withdrawals</p>
+            <p className="text-2xl font-bold font-mono text-foreground mb-1">{formatBCH(totalWithdrawn)}</p>
+            <p className="text-sm text-muted-foreground">Total Withdrawn</p>
           </motion.div>
 
+          {/* Pending */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="glass-card rounded-xl p-6 border-border/50"
+            className={cn(
+              'glass-card-elevated rounded-2xl p-6 hover-lift group',
+              pendingWithdrawals.length > 0 && 'border-amber-500/30'
+            )}
           >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Pending Withdrawals</p>
-              <Clock className="w-5 h-5 text-yellow-400" />
+            <div className="flex items-start justify-between mb-3">
+              <div className={cn(
+                'w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform',
+                pendingWithdrawals.length > 0 ? 'bg-amber-500/10 pending-glow' : 'bg-muted/50'
+              )}>
+                <Clock className={cn('w-5 h-5', pendingWithdrawals.length > 0 ? 'text-amber-400' : 'text-muted-foreground')} />
+              </div>
+              {pendingWithdrawals.length > 0 && (
+                <StatusBadge status="pending" label={`${pendingWithdrawals.length} pending`} size="sm" />
+              )}
             </div>
-            <p className="text-3xl font-bold text-foreground">{pendingWithdrawals.length}</p>
-            <p className="text-xs text-muted-foreground mt-2">Awaiting confirmation</p>
+            <p className="text-2xl font-bold font-mono text-foreground mb-1">
+              {pendingWithdrawals.length > 0 ? formatBCH(pendingAmount) : '—'}
+            </p>
+            <p className="text-sm text-muted-foreground">Awaiting Confirmation</p>
           </motion.div>
 
+          {/* Transaction Count */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="glass-card rounded-xl p-6 border-border/50"
+            className="glass-card-elevated rounded-2xl p-6 hover-lift group"
           >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Total Withdrawals</p>
-              <Download className="w-5 h-5 text-muted-foreground" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Download className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">Total</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{withdrawals.length}</p>
-            <p className="text-xs text-muted-foreground mt-2">All time</p>
+            <p className="text-2xl font-bold font-mono text-foreground mb-1">{withdrawals.length}</p>
+            <p className="text-sm text-muted-foreground">Withdrawals Made</p>
           </motion.div>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Pill style */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="glass-card rounded-xl p-6 border-border/50 mb-6"
+          className="flex items-center gap-2 mb-6 overflow-x-auto pb-2"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Withdrawal History</h2>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 rounded-lg bg-muted/50 border border-border focus:border-primary focus:outline-none text-foreground"
+          {['all', 'confirmed', 'pending', 'failed'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={cn(
+                'px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap',
+                filterStatus === status
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
             >
-              <option value="all">All Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+              {status !== 'all' && (
+                <span className="ml-1.5 opacity-70">
+                  ({withdrawals.filter((w: any) => status === 'all' || w.status === status).length})
+                </span>
+              )}
+            </button>
+          ))}
         </motion.div>
 
         {/* Withdrawals List */}
@@ -194,80 +213,119 @@ const WithdrawalsPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="glass-card rounded-xl p-6 border-border/50"
+          className="glass-card-elevated rounded-2xl overflow-hidden"
         >
           {filteredWithdrawals.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
-                <Wallet className="w-8 h-8 text-muted-foreground/50" />
-              </div>
-              <p className="text-lg font-medium text-foreground mb-2">No withdrawals yet</p>
-              <p className="text-sm mb-4">Start withdrawing your earnings to your wallet</p>
-              <Link to="/settings">
-                <Button className="gap-2">
-                  <ArrowUpRight className="w-4 h-4" />
-                  Create Withdrawal
-                </Button>
-              </Link>
+            <div className="text-center py-16 px-4">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-5"
+              >
+                <Sparkles className="w-10 h-10 text-muted-foreground/40" />
+              </motion.div>
+              <p className="text-xl font-semibold text-foreground mb-2">
+                {filterStatus !== 'all' ? `No ${filterStatus} withdrawals` : 'No withdrawals yet'}
+              </p>
+              <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                {filterStatus !== 'all' 
+                  ? 'Try selecting a different filter above.'
+                  : 'When you withdraw your earnings, they\'ll appear here.'}
+              </p>
+              {filterStatus === 'all' && (
+                <Link to="/settings">
+                  <Button className="gap-2 hover-lift">
+                    <Wallet className="w-4 h-4" />
+                    Make Your First Withdrawal
+                  </Button>
+                </Link>
+              )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredWithdrawals.map((withdrawal: any, index: number) => (
-                <motion.div
-                  key={withdrawal.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="group p-4 bg-muted/20 rounded-xl hover:bg-muted/40 border border-border/50 hover:border-primary/30 transition-all duration-200"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border ${getStatusColor(withdrawal.status)}`}>
-                        {getStatusIcon(withdrawal.status)}
+            <div className="divide-y divide-border/50">
+              <AnimatePresence mode="popLayout">
+                {filteredWithdrawals.map((withdrawal: any, index: number) => (
+                  <motion.div
+                    key={withdrawal.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="group p-5 hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Status indicator */}
+                      <div className={cn(
+                        'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105',
+                        withdrawal.status === 'confirmed' && 'bg-primary/10',
+                        withdrawal.status === 'pending' && 'bg-amber-500/10 pending-glow',
+                        withdrawal.status === 'failed' && 'bg-destructive/10'
+                      )}>
+                        {withdrawal.status === 'confirmed' && <CheckCircle className="w-5 h-5 text-primary" />}
+                        {withdrawal.status === 'pending' && <Clock className="w-5 h-5 text-amber-400" />}
+                        {withdrawal.status === 'failed' && <XCircle className="w-5 h-5 text-destructive" />}
                       </div>
+
+                      {/* Details */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="font-semibold text-foreground">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-lg font-semibold font-mono text-foreground">
                             {formatBCH(withdrawal.amountSats)}
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(withdrawal.status)}`}>
-                            {withdrawal.status}
                           </span>
+                          <StatusBadge status={getStatusType(withdrawal.status)} size="sm" />
                         </div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          To: {truncateAddress(withdrawal.toAddress || '', 16)}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {formatDate(withdrawal.createdAt)}
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span className="font-mono truncate max-w-[200px]">
+                            → {truncateAddress(withdrawal.toAddress || '', 12)}
+                          </span>
+                          <span className="text-muted-foreground/50">•</span>
+                          <span>{formatDate(withdrawal.createdAt)}</span>
                         </div>
                         {withdrawal.feeSats > 0 && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Fee: {formatBCH(withdrawal.feeSats)}
-                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Network fee: {formatBCH(withdrawal.feeSats)}
+                          </p>
                         )}
                       </div>
-                    </div>
-                    {withdrawal.txid && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        asChild
-                      >
+
+                      {/* Action */}
+                      {withdrawal.txid && (
                         <a
                           href={`https://blockchair.com/bitcoin-cash/transaction/${withdrawal.txid}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
                         >
-                          <ArrowUpRight className="w-4 h-4" />
+                          <span className="hidden sm:inline">View</span>
+                          <ExternalLink className="w-4 h-4" />
                         </a>
-                      </Button>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
+        </motion.div>
+
+        {/* Fee info card */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="mt-6 p-4 rounded-xl bg-primary/5 border border-primary/10"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground mb-0.5">Low Fees, Fast Withdrawals</p>
+              <p className="text-sm text-muted-foreground">
+                Only 1% service fee on withdrawals. Your BCH is sent directly to your wallet with minimal network fees (~$0.002).
+              </p>
+            </div>
+          </div>
         </motion.div>
       </div>
     </div>
@@ -275,6 +333,3 @@ const WithdrawalsPage = () => {
 };
 
 export default WithdrawalsPage;
-
-
-
