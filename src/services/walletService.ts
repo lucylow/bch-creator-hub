@@ -92,7 +92,7 @@ class WalletService {
         total: (data.confirmed || 0) + (data.unconfirmed || 0)
       };
     } catch (error) {
-      logger.warn('Web3 balance fetch failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { address });
+      logger.warn('Web3 balance fetch failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), address });
       // Fallback to mock data
       return demoWallet.getBalance(address);
     }
@@ -145,7 +145,7 @@ class WalletService {
         return await this.connectWalletDirect(walletType);
       }
     } catch (error) {
-      logger.warn('Web3 wallet connection failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { walletType });
+      logger.warn('Web3 wallet connection failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), walletType });
       // Fallback to mock data
       return demoWallet.connect();
     }
@@ -337,7 +337,7 @@ class WalletService {
         txid: data.txid
       };
     } catch (error) {
-      logger.warn('Web3 payment failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { toAddress, amountSats });
+      logger.warn('Web3 payment failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), toAddress, amountSats });
       // Fallback to mock data
       return demoWallet.sendPayment(toAddress, amountSats, payload);
     }

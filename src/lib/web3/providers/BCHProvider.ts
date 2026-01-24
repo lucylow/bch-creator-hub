@@ -49,10 +49,15 @@ export class BCHProvider {
       
       window.addEventListener('message', (event) => {
         if (event.data.type === 'BCH_WALLET_CONNECTED') {
-          this.handleWalletConnected(event.data);
+          this.onWalletConnected(event.data);
         }
       });
     }
+  }
+
+  private onWalletConnected(data: any) {
+    // Handle wallet connection event from browser extension
+    this.emit('walletConnected', data);
   }
 
   private getRestURL(): string {
@@ -444,11 +449,12 @@ export class BCHProvider {
         timestamp: Date.now()
       });
       
-      if (response.success && response.data?.token) {
-        localStorage.setItem('auth_token', response.data.token);
+      const responseData = response.data as { token?: string } | undefined;
+      if (response.success && responseData?.token) {
+        localStorage.setItem('auth_token', responseData.token);
         localStorage.setItem('wallet_address', address);
         
-        return { token: response.data.token };
+        return { token: responseData.token };
       } else {
         throw new Error('Authentication failed');
       }

@@ -266,7 +266,7 @@ const InteractiveDemo = () => {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                delayChildren={0.2}
+                transition={{ delay: 0.2 }}
                 className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
               >
                 <Sparkles className="w-4 h-4 text-primary" />

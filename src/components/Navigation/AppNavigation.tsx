@@ -94,17 +94,15 @@ const AppNavigation = () => {
                   key={link.path}
                   to={link.path}
                   end={link.exact}
-                  className={({ isActive: navIsActive }) =>
-                    cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 relative',
-                      'text-muted-foreground hover:text-foreground',
-                      (isActive || navIsActive) && 'bg-primary/10 text-primary'
-                    )
-                  }
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 relative',
+                    'text-muted-foreground hover:text-foreground',
+                    isActive && 'bg-primary/10 text-primary'
+                  )}
                 >
                   <link.icon className="w-4 h-4" />
                   <span className="font-medium">{link.label}</span>
-                  {(isActive || isActiveRoute(link.path, link.exact ?? false)) && (
+                  {isActive && (
                     <motion.div
                       layoutId="activeTab"
                       className="absolute inset-0 rounded-lg bg-primary/10 -z-10"
@@ -201,17 +199,15 @@ const AppNavigation = () => {
                               to={link.path}
                               end={link.exact}
                               onClick={() => setIsOpen(false)}
-                              className={({ isActive: navIsActive }) =>
-                                cn(
-                                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-all',
-                                  'text-muted-foreground hover:bg-muted',
-                                  (isActive || navIsActive) && 'bg-primary/10 text-primary font-medium'
-                                )
-                              }
+                              className={cn(
+                                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all',
+                                'text-muted-foreground hover:bg-muted',
+                                isActive && 'bg-primary/10 text-primary font-medium'
+                              )}
                             >
                               <link.icon className="w-5 h-5 flex-shrink-0" />
                               <span>{link.label}</span>
-                              {(isActive || isActiveRoute(link.path, link.exact ?? false)) && (
+                              {isActive && (
                                 <ChevronRight className="w-4 h-4 ml-auto text-primary" />
                               )}
                             </NavLink>

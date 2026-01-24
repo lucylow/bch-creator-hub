@@ -38,7 +38,7 @@ export async function canAccessContent(
     };
   } catch (error) {
     // Fallback to mock data
-    logger.warn('Paywall API check failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { address, contentId });
+    logger.warn('Paywall API check failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), address, contentId });
     const hasAccess = await mockIndexerApi.hasPaidForContent(address, contentId);
     return {
       hasAccess,
@@ -68,7 +68,7 @@ export async function hasAccessNFT(
     return data.hasAccess || false;
   } catch (error) {
     // Fallback to mock data
-    logger.warn('Paywall NFT API check failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { address, tokenId });
+    logger.warn('Paywall NFT API check failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), address, tokenId });
     return mockIndexerApi.hasAccessNFT(address, tokenId);
   }
 }
@@ -94,7 +94,7 @@ export async function verifyPayment(
     return data.verified || false;
   } catch (error) {
     // Fallback to mock data - accept payments that match mock data patterns
-    logger.warn('Paywall verification API failed, falling back to mock data', error instanceof Error ? error : new Error(String(error)), { txid, contentId });
+    logger.warn('Paywall verification API failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), txid, contentId });
     return txid.startsWith('demo_tx_') || txid.startsWith('pay_');
   }
 }

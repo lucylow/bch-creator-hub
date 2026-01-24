@@ -181,6 +181,7 @@ const PaymentLinksPage = () => {
       </div>
 
       {/* QR Code Modal */}
+      {/* QR Code Modal */}
       {selectedLink && (
         <QRCodeModal
           open={qrModalOpen}
@@ -192,7 +193,6 @@ const PaymentLinksPage = () => {
           level="M"
         />
       )}
-      </div>
     </div>
   );
 };

@@ -1,12 +1,12 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation, Routes, Route } from 'react-router-dom';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { ReactNode } from 'react';
 
 interface PageTransitionProps {
   children: ReactNode;
 }
 
-const pageVariants = {
+const pageVariants: Variants = {
   initial: {
     opacity: 0,
     y: 10,
@@ -16,7 +16,7 @@ const pageVariants = {
     y: 0,
     transition: {
       duration: 0.3,
-      ease: [0.22, 1, 0.36, 1],
+      ease: 'easeOut',
     },
   },
   exit: {
@@ -24,7 +24,7 @@ const pageVariants = {
     y: -10,
     transition: {
       duration: 0.2,
-      ease: [0.22, 1, 0.36, 1],
+      ease: 'easeIn',
     },
   },
 };
