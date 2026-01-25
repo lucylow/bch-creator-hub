@@ -20,7 +20,7 @@ import type {
   Webhook,
 } from '@/types/api';
 import { isDemoMode } from '@/config/demo';
-import { generateMockDashboardStats, generateMockTransactions, generateMockPaymentIntents } from '@/demo/mockData';
+import { generateMockDashboardStats, generateMockTransactions, generateMockPaymentIntents, generateMockWithdrawals } from '@/demo/mockData';
 
 /**
  * Unified API Service
@@ -212,6 +212,12 @@ class ApiService {
    * Get creator's payment intents
    */
   async getPaymentIntents(): Promise<ApiResponse<PaymentIntent[]>> {
+    if (isDemoMode()) {
+      return {
+        success: true,
+        data: generateMockPaymentIntents(5),
+      };
+    }
     return this.request<PaymentIntent[]>('/api/payments/intents');
   }
 
@@ -258,6 +264,18 @@ class ApiService {
     limit?: number;
     status?: string;
   }): Promise<ApiResponse<{ transactions: Transaction[]; total: number; page: number; limit: number }>> {
+    if (isDemoMode()) {
+      const limit = params?.limit || 10;
+      return {
+        success: true,
+        data: {
+          transactions: generateMockTransactions(limit),
+          total: 50,
+          page: params?.page || 1,
+          limit,
+        },
+      };
+    }
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -271,6 +289,11 @@ class ApiService {
    * Get transaction by ID
    */
   async getTransaction(txid: string): Promise<ApiResponse<Transaction>> {
+    if (isDemoMode()) {
+      const mockTx = generateMockTransactions(1)[0];
+      mockTx.txid = txid;
+      return { success: true, data: mockTx };
+    }
     return this.request<Transaction>(`/api/transactions/${txid}`);
   }
 
@@ -278,6 +301,18 @@ class ApiService {
    * Get transaction stats
    */
   async getTransactionStats(): Promise<ApiResponse<TransactionStats>> {
+    if (isDemoMode()) {
+      return {
+        success: true,
+        data: {
+          totalTransactions: Math.floor(Math.random() * 200) + 50,
+          totalVolume: Math.floor(Math.random() * 50000000) + 10000000,
+          avgTransaction: Math.floor(Math.random() * 200000) + 50000,
+          todayCount: Math.floor(Math.random() * 20) + 5,
+          todayVolume: Math.floor(Math.random() * 5000000) + 1000000,
+        },
+      };
+    }
     return this.request<TransactionStats>('/api/transactions/stats/summary');
   }
 
@@ -285,6 +320,12 @@ class ApiService {
    * Get withdrawals
    */
   async getWithdrawals(): Promise<ApiResponse<{ withdrawals: any[] }>> {
+    if (isDemoMode()) {
+      return {
+        success: true,
+        data: { withdrawals: generateMockWithdrawals(5) },
+      };
+    }
     return this.request<{ withdrawals: any[] }>('/api/withdrawals');
   }
 
