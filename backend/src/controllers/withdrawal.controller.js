@@ -2,6 +2,7 @@ const WithdrawalService = require('../services/withdrawal.service');
 const Withdrawal = require('../models/Withdrawal');
 const { validationResult } = require('express-validator');
 const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
+const AuditService = require('../services/audit.service');
 
 class WithdrawalController {
   // Get withdrawal preview/calculation
@@ -57,6 +58,14 @@ class WithdrawalController {
           tier: calculation.tier,
           feeType: calculation.feeType
         }
+      });
+
+      AuditService.logWithdrawalCreated({
+        creatorId,
+        amountSats: calculation.payoutSats,
+        toAddress,
+        withdrawalId: withdrawal.id,
+        requestId: req.id
       });
 
       res.json({

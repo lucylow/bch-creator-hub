@@ -13,6 +13,17 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// Wallet auth (BIP-322 login) validation
+const validateWalletAuth = [
+  body('address').notEmpty().withMessage('Address is required').custom((v) => {
+    if (!validateBchAddress(v)) throw new Error('Invalid BCH address');
+    return true;
+  }),
+  body('message').notEmpty().isString().isLength({ min: 10, max: 2048 }).withMessage('Message must be 10–2048 chars'),
+  body('signature').notEmpty().isString().isLength({ min: 64, max: 1024 }).withMessage('Signature required'),
+  handleValidationErrors
+];
+
 // Creator validation
 const validateCreatorUpdate = [
   body('displayName').optional().isLength({ min: 1, max: 100 }),
@@ -166,8 +177,13 @@ const validateTransactionBroadcast = [
   handleValidationErrors
 ];
 
+// Alias for routes that use "validate"
+const validate = handleValidationErrors;
+
 module.exports = {
   handleValidationErrors,
+  validate,
+  validateWalletAuth,
   validateCreatorUpdate,
   validatePaymentIntent,
   validateTransaction,

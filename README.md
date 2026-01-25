@@ -24,6 +24,7 @@
 - [Key Features](#key-features)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
+  - [Technical diagrams](#technical-diagrams) (system topology, ZMQ pipeline, OP_RETURN, security)
 - [System Components](#system-components)
 - [Smart Contracts](#smart-contracts)
 - [Payment Flow](#payment-flow)
@@ -43,7 +44,15 @@
 
 ## Overview
 
-**BCH Creator Hub** is a decentralized payment platform built on Bitcoin Cash (BCH) that enables creators to receive payments through a unified interface. The platform leverages CashScript smart contracts, OP_RETURN metadata, and real-time blockchain indexing to provide a non-custodial, low-fee payment solution for content creators, artists, developers, and entrepreneurs.
+**BCH Creator Hub** is a decentralized payment platform built on Bitcoin Cash (BCH) that enables creators to receive payments through a unified interface. The platform uses **CashScript** smart contracts, **OP_RETURN** metadata for routing, and **ZMQ-based** blockchain indexing to provide a non-custodial, low-fee payment solution for content creators, artists, developers, and entrepreneurs.
+
+| Layer | Role |
+|-------|------|
+| **Frontend** | React dashboard, wallet connect (BIP-322), payment links & QR |
+| **API** | Express REST + WebSocket, auth, payment intents, withdrawals |
+| **Indexer** | ZMQ → parse blocks → OP_RETURN → PostgreSQL → WebSocket |
+| **Contracts** | CreatorRouter (aggregate + withdraw), SubscriptionPass (CashTokens) |
+| **Chain** | BCH mainnet/testnet, single address per creator, no custody |
 
 ### What Problem Does It Solve?
 
@@ -319,6 +328,191 @@ flowchart LR
     end
 ```
 
+### Technical diagrams
+
+| Diagram | Description |
+|---------|-------------|
+| [System architecture](#system-architecture-overview) | Client, API, data, and blockchain layers |
+| [Component interaction](#component-interaction-flow) | Auth, payment intent, and real-time indexing sequence |
+| [Data flow](#data-flow-architecture) | Payment creation → execution → processing → withdrawal |
+| [Infrastructure & deployment](#infrastructure--deployment-topology) | Docker services and BCH connectivity |
+| [ZMQ indexer pipeline](#zmq-indexer-pipeline) | Block subscription → parse → DB → WebSocket/cache |
+| [OP_RETURN payload](#op_return-payload-structure) | Byte layout and payment types |
+| [Technology stack](#technology-stack) | Frontend, backend, and blockchain stack |
+| [Security layers](#security-layers) | CORS → auth → validation → handlers |
+| [CreatorRouter contract flow](#creatorrouter-contract-flow) | Contract state and withdrawal checks |
+| [E2E payment lifecycle](#end-to-end-payment-lifecycle) | Link → pay → index → dashboard |
+| [Entity relationship](#entity-relationship-diagram) | Core tables and relationships |
+
+#### Infrastructure & deployment topology
+
+Diagram of services when running via Docker and how they connect to the BCH network.
+
+```mermaid
+flowchart TB
+    subgraph "External"
+        BCH[BCH Network<br/>BCHN / Flowee]
+        REST[BCH REST API<br/>Fullstack.cash etc.]
+    end
+
+    subgraph "Docker / Host"
+        subgraph "Application"
+            FE[Frontend<br/>Vite React :3000]
+            API[Backend API<br/>Express :3001]
+            SCAN[Scanner / Indexer<br/>ZMQ + Jobs]
+        end
+        
+        subgraph "Data"
+            PG[(PostgreSQL<br/>:5432)]
+            RD[(Redis<br/>:6379)]
+        end
+        
+        subgraph "Optional"
+            PROM[Prometheus :9090]
+            GRAF[Grafana :3002]
+        end
+    end
+
+    FE -->|HTTP/WS| API
+    API --> PG
+    API --> RD
+    SCAN --> PG
+    SCAN --> RD
+    SCAN -->|ZMQ hashblock| BCH
+    SCAN -->|REST| REST
+    API --> REST
+    PROM --> API
+    GRAF --> PROM
+    
+    style BCH fill:#f7931a
+    style API fill:#339933
+    style PG fill:#336791
+    style RD fill:#dc382d
+```
+
+#### ZMQ indexer pipeline
+
+End-to-end path from chain events to creator-facing updates.
+
+```mermaid
+flowchart LR
+    subgraph "Chain"
+        NODE[BCH Node]
+        ZMQ[ZMQ<br/>hashblock]
+    end
+
+    subgraph "Indexer"
+        SUB[Subscribe<br/>hashblock]
+        FETCH[Fetch block<br/>txs via REST]
+        PARSE[Parse OP_RETURN<br/>decode payload]
+        MATCH[Match creator<br/>contract address]
+        DB_W[(Write to<br/>PostgreSQL)]
+        EVT[Emit payment<br/>event]
+    end
+
+    subgraph "Consumers"
+        WS[WebSocket]
+        CACHE[Redis cache<br/>balance invalidation]
+        JOBS[Bull jobs]
+    end
+
+    NODE --> ZMQ --> SUB --> FETCH --> PARSE --> MATCH --> DB_W
+    MATCH --> EVT
+    EVT --> WS
+    EVT --> CACHE
+    EVT --> JOBS
+    
+    style NODE fill:#f7931a
+    style DB_W fill:#336791
+```
+
+#### OP_RETURN payload structure
+
+Byte layout used to route payments to creators and classify payment type.
+
+```mermaid
+flowchart LR
+    subgraph payload["OP_RETURN payload (hex)"]
+        V["1 byte<br/>Version (0x01)"]
+        C["16 bytes<br/>Creator ID"]
+        T["1 byte<br/>Payment type"]
+        I["4 bytes<br/>Content ID"]
+        M["Variable<br/>Metadata UTF-8"]
+    end
+
+    V --> C --> T --> I --> M
+
+    subgraph legend["Payment types"]
+        L0["0x01 = Subscription"]
+        L1["0x02 = Tip"]
+        L2["0x03 = Unlock / Paywall"]
+        L3["0x04 = Recurring"]
+    end
+```
+
+**Example (hex):** `01 7a3b8c9f12a45d6e 02 0000001f 436f66666565546970`  
+→ Version 1, Creator `7a3b8c9f12a45d6e`, Type Tip, Content 31, Metadata `"CoffeeTip"`.
+
+#### Technology stack
+
+```mermaid
+flowchart TB
+    subgraph "Frontend"
+        R[React 18 + TypeScript]
+        V[Vite 5]
+        T[Tailwind + shadcn/ui]
+        Q[React Query]
+        R --> V
+        R --> T
+        R --> Q
+    end
+
+    subgraph "Backend"
+        E[Express]
+        PG2[(PostgreSQL)]
+        R2[Redis]
+        B[Bull]
+        E --> PG2
+        E --> R2
+        E --> B
+    end
+
+    subgraph "Blockchain"
+        CS[CashScript]
+        Z[Zeromq]
+        BIP[BIP-322]
+        BC[BCH Network]
+        CS --> BC
+        Z --> BC
+    end
+
+    R -->|REST + WS| E
+    E --> CS
+    E --> Z
+```
+
+#### Security layers
+
+Request path through authentication, validation, and resource checks.
+
+```mermaid
+flowchart TB
+    REQ[Incoming request] --> CORS{CORS}
+    CORS -->|Pass| HELMET[Helmet headers]
+    HELMET --> RATE[Rate limit]
+    RATE --> AUTH{Authenticated?}
+    AUTH -->|Public route| VALID
+    AUTH -->|/api/*| JWT{JWT valid?}
+    JWT -->|No| 401[401 Unauthorized]
+    JWT -->|Yes| BIP322{BIP-322 verified<br/>on login}
+    BIP322 --> VALID[Input validation<br/>express-validator]
+    VALID --> RBAC{Resource access<br/>creator_id match}
+    RBAC -->|OK| HANDLER[Controller]
+    RBAC -->|Forbidden| 403[403 Forbidden]
+    HANDLER --> DB[(DB / Redis)]
+    HANDLER --> AUDIT[Audit log]
+```
+
 ---
 
 ## System Components
@@ -506,6 +700,44 @@ CREATE TABLE blocks (
 
 ## Smart Contracts
 
+### CreatorRouter contract flow
+
+High-level flow for payments in and withdrawals out of the CreatorRouter contract.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Deployed: Deploy(creatorPubKey, servicePubKey, feeBasisPoints)
+    Deployed --> Holding: pay(bytes) / receive to P2SH
+    Holding --> Holding: Further payments
+    Holding --> Withdrawn: withdraw(sig) / withdrawAmount(sig, amount)
+    Holding --> Withdrawn: emergencyWithdraw(sig) after 30 days
+    Withdrawn --> [*]
+
+    note right of Holding: Balance locked until<br/>creator signs withdrawal
+    note right of Withdrawn: BCH to creator (± fee to service)
+```
+
+```mermaid
+flowchart LR
+    subgraph "Contract state"
+        IN[Payments in<br/>P2SH / pay ]
+        BAL[Contract balance]
+        OUT[Withdrawal out]
+    end
+    IN --> BAL
+    BAL -->|"withdraw(sig)"| OUT
+    BAL -->|"emergencyWithdraw(sig)"| OUT
+    
+    subgraph "Checks"
+        SIG[checkSig(creatorSig, creatorPubKey)]
+        FEE["fee ≤ feeBasisPoints/10000"]
+        TIME["emergency: time ≥ minWithdrawalTime"]
+    end
+    OUT --> SIG
+    OUT --> FEE
+    OUT --> TIME
+```
+
 ### CreatorRouter Contract
 
 The main payment routing contract that aggregates payments and handles withdrawals.
@@ -537,7 +769,41 @@ CashToken-based subscription system using NFT passes.
 
 ## Payment Flow
 
-### Standard Payment Flow
+### End-to-end payment lifecycle
+
+Single path from creator link to confirmed balance.
+
+```mermaid
+flowchart TB
+    subgraph "1. Create"
+        A1[Creator: Create payment link] --> A2[API: Store intent]
+        A2 --> A3[Return QR + URL]
+    end
+
+    subgraph "2. Pay"
+        B1[Supporter: Scan QR / open URL] --> B2[Wallet: Build tx]
+        B2 --> B3["Output → Creator contract + OP_RETURN"]
+        B3 --> B4[Broadcast to BCH]
+    end
+
+    subgraph "3. Index"
+        C1[ZMQ: New block] --> C2[Indexer: Fetch block]
+        C2 --> C3[Parse OP_RETURN → creatorId, type, amount]
+        C3 --> C4[Upsert transaction, invalidate cache]
+        C4 --> C5[Emit WebSocket event]
+    end
+
+    subgraph "4. Confirm"
+        D1[Dashboard: WS event] --> D2[Refresh balance / tx list]
+        D2 --> D3[Creator sees payment]
+    end
+
+    A3 --> B1
+    B4 --> C1
+    C5 --> D1
+```
+
+### Standard Payment Flow (sequence)
 
 ```mermaid
 sequenceDiagram
@@ -1064,7 +1330,33 @@ docker-compose up -d
 
 ## Development
 
-### Project Structure
+### Project structure
+
+High-level map of the repo:
+
+```mermaid
+flowchart TB
+    subgraph repo["bch-creator-hub"]
+        subgraph fe["Frontend (src/)"]
+            P[pages/]
+            C[components/]
+            H[hooks/]
+            CX[contexts/]
+            L[lib/web3]
+        end
+        subgraph be["Backend (backend/)"]
+            SRC[src/]
+            CTR[contracts/src/]
+            SRC --> CTR
+        end
+        subgraph docs_etc["Docs & ops"]
+            DOC[docs/]
+            SCR[scripts/]
+            MON[monitoring/]
+        end
+    end
+    fe -->|REST + WS| SRC
+```
 
 ```
 bch-creator-hub/

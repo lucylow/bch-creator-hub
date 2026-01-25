@@ -5,8 +5,8 @@ import { getUserFriendlyMessage } from '@/utils/errorUtils';
 
 type State = { hasError: boolean; error: Error | null };
 
-export default class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, State> {
-  constructor(props: React.PropsWithChildren<{}>) {
+export default class ErrorBoundary extends React.Component<React.PropsWithChildren<object>, State> {
+  constructor(props: React.PropsWithChildren<object>) {
     super(props);
     this.state = { hasError: false, error: null };
   }

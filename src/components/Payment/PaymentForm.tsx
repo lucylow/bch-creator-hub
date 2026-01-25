@@ -21,7 +21,7 @@ type Props = {
   isConnected: boolean;
   address?: string;
   isProcessing?: boolean;
-  onPayment: () => Promise<any>;
+  onPayment: () => Promise<{ txid?: string } | void>;
   onConnectWallet?: () => void;
 };
 
@@ -49,7 +49,7 @@ const PaymentForm: React.FC<Props> = ({
 
   const handleAmountChange = (v: string) => {
     setLocalAmount(v);
-    setAmount && setAmount(v);
+    if (setAmount) setAmount(v);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,7 +68,7 @@ const PaymentForm: React.FC<Props> = ({
     }
 
     if (!isConnected) {
-      onConnectWallet && onConnectWallet();
+      if (onConnectWallet) onConnectWallet();
       return;
     }
 

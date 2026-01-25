@@ -7,13 +7,15 @@ const bitcore = require('bitcore-lib-cash');
 const BCHJS = require('@psf/bch-js');
 const { query } = require('../config/database');
 const { buildWithdrawSkeleton } = require('../lib/withdraw_builder');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { verifyToken, withdrawalLimiter } = require('../middleware/auth.middleware');
+const AuditService = require('../services/audit.service');
 
 const router = express.Router();
 router.use(express.json());
 
-// All routes require authentication
+// All routes require authentication and withdrawal rate limiting
 router.use(verifyToken);
+router.use(withdrawalLimiter);
 
 const bchjs = new BCHJS({ restURL: process.env.BCH_REST || undefined });
 
@@ -110,6 +112,14 @@ router.post('/withdraw/:creatorId/skeleton', async (req, res) => {
         expiresAt.toISOString()
       ]
     );
+
+    const totalSats = (skeleton.totals && skeleton.totals.payoutSats) ? skeleton.totals.payoutSats + (skeleton.totals.serviceSats || 0) : 0;
+    AuditService.logContractWithdrawSkeleton({
+      creatorId,
+      withdrawRequestId,
+      totalSats,
+      requestId: req.id
+    });
 
     return res.json({
       withdrawRequestId,
@@ -227,6 +237,13 @@ router.post('/tx/broadcast', async (req, res) => {
 
     // Update withdraw_request
     await query('UPDATE withdraw_requests SET status = $1 WHERE id = $2', ['broadcasted', withdrawRequestId]);
+
+    AuditService.logContractWithdrawBroadcast({
+      creatorId: wr.creator_id,
+      withdrawRequestId,
+      txid,
+      requestId: req.id
+    });
 
     return res.json({ txid });
   } catch (err) {

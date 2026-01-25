@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
+const { getAllowedOrigins } = require('./config/security');
 const { createBullBoard } = require('bull-board');
 
 const authRoutes = require('./routes/auth.routes');
@@ -16,8 +17,10 @@ const subscriptionRoutes = require('./routes/subscription.routes');
 const withdrawalRoutes = require('./routes/withdrawal.routes');
 const contractWithdrawRoutes = require('./routes/contract-withdraw.routes');
 const cashtokenRoutes = require('./routes/cashtoken.routes');
+const walletRoutes = require('./routes/wallet.routes');
 
 const errorHandler = require('./middleware/error.middleware');
+const BCHService = require('./services/bch.service');
 const { apiLimiter } = require('./middleware/auth.middleware');
 const requestIdMiddleware = require('./middleware/requestId.middleware');
 
@@ -76,6 +79,30 @@ class App {
         service: 'BCH Paywall Router API'
       });
     });
+
+    // BCH blockchain health: verify connectivity to BCH API (block height)
+    this.app.get('/health/bch', async (req, res) => {
+      try {
+        const result = await BCHService.checkHealth();
+        const status = result.ok ? 200 : 503;
+        res.status(status).json({
+          status: result.ok ? 'healthy' : 'degraded',
+          timestamp: new Date().toISOString(),
+          bch: {
+            ok: result.ok,
+            blockHeight: result.blockHeight,
+            latencyMs: result.latencyMs,
+            error: result.error
+          }
+        });
+      } catch (err) {
+        res.status(503).json({
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          bch: { ok: false, error: err.message || 'BCH health check failed' }
+        });
+      }
+    });
   }
 
   initializeRoutes() {
@@ -90,6 +117,7 @@ class App {
     this.app.use('/api/withdrawals', withdrawalRoutes);
     this.app.use('/api/contract', contractWithdrawRoutes);
     this.app.use('/api/cashtokens', cashtokenRoutes);
+    this.app.use('/api/wallet', walletRoutes);
     this.app.use('/api', payloadRoutes);
     
     // Bull Board for queue monitoring

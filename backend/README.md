@@ -79,11 +79,13 @@ BCH_NETWORK=mainnet
 
 **Testnet:**
 - Safe for development and testing
+- Uses **tapi.fullstack.cash** for BCH REST/WebSocket APIs
 - Uses testnet BCH (no real value)
 - Explorer: https://www.blockchain.com/bch-testnet
 - Default network for all services
 
 **Mainnet:**
+- Uses **api.fullstack.cash** for BCH REST/WebSocket APIs
 - Uses real BCH (real value!)
 - Requires careful configuration
 - Explorer: https://www.blockchain.com/bch

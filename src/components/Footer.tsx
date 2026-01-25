@@ -2,6 +2,7 @@ import { Route, Twitter, Github } from 'lucide-react';
 
 const footerLinks = {
   product: [
+    { label: 'Use Cases', href: '#use-cases' },
     { label: 'Features', href: '#features' },
     { label: 'How It Works', href: '#how-it-works' },
     { label: 'Pricing', href: '#' },

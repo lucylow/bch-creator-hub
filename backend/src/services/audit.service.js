@@ -2,6 +2,28 @@
  * Audit logging for security and compliance.
  * Logs all financial and sensitive actions to a dedicated audit stream for monitoring and forensics.
  */
+const path = require('path');
+const fs = require('fs');
+const winston = require('winston');
+
+const logsDir = path.join(__dirname, '../../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const auditLogger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  defaultMeta: { service: 'bch-paywall-router', audit: true },
+  transports: [
+    new winston.transports.File({ filename: path.join(logsDir, 'audit.log') })
+  ]
+});
+
+// Also send to main logger for combined.log
 const logger = require('../utils/logger');
 
 const AUDIT_EVENTS = {
@@ -31,6 +53,7 @@ function audit(event, meta = {}) {
     at: new Date().toISOString(),
     ...meta
   };
+  auditLogger.info(event, entry);
   logger.info('AUDIT', entry);
 }
 

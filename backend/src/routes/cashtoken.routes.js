@@ -5,9 +5,9 @@
 const express = require('express');
 const router = express.Router();
 const cashtokenController = require('../controllers/cashtoken.controller');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth.middleware');
 const { body, param, query } = require('express-validator');
-const { validate } = require('../middleware/validation');
+const { validate } = require('../middleware/validation.middleware');
 
 /**
  * Get tokens by owner address

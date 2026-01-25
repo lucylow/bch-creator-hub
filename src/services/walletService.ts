@@ -78,18 +78,22 @@ class WalletService {
         logger.warn('BCH provider balance check failed, trying API', providerError);
       }
 
-      // Fallback to API
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/wallet/balance/${address}`);
+      // Fallback to API (backend returns { success, data: { confirmed, unconfirmed, total } })
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${base}/api/wallet/balance/${encodeURIComponent(address)}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch balance');
       }
       
-      const data = await response.json();
+      const json = await response.json();
+      const bal = json?.data ?? json;
+      const confirmed = Number(bal?.confirmed ?? 0) || 0;
+      const unconfirmed = Number(bal?.unconfirmed ?? 0) || 0;
       return {
-        confirmed: data.confirmed || 0,
-        unconfirmed: data.unconfirmed || 0,
-        total: (data.confirmed || 0) + (data.unconfirmed || 0)
+        confirmed,
+        unconfirmed,
+        total: Number(bal?.total ?? 0) || confirmed + unconfirmed
       };
     } catch (error) {
       logger.warn('Web3 balance fetch failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), address });

@@ -3,6 +3,7 @@ const PaymentService = require('../services/payment.service');
 const { validationResult } = require('express-validator');
 const logger = require('../utils/logger');
 const { ValidationError, NotFoundError, AppError } = require('../utils/errors');
+const AuditService = require('../services/audit.service');
 const MicropaymentService = require('../services/micropayment.service');
 const QRCodeUtil = require('../utils/qrcode.util');
 
@@ -182,6 +183,15 @@ class PaymentController {
         senderAddress,
         receiverAddress: req.creator.contract_address,
         metadata
+      });
+
+      AuditService.logPaymentRecorded({
+        creatorId,
+        txid,
+        amountSats,
+        intentId: paymentId,
+        source: 'api',
+        requestId: req.id
       });
 
       res.status(201).json({

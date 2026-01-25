@@ -64,7 +64,7 @@ export class BCHProvider {
   private getRestURL(): string {
     const urls: Record<string, string> = {
       mainnet: 'https://api.fullstack.cash/v5/',
-      testnet: 'https://api.fullstack.cash/v5/',
+      testnet: 'https://tapi.fullstack.cash/v5/',
       regtest: 'http://localhost:3000/v5/'
     };
     return urls[this.network] || urls.testnet;
@@ -546,18 +546,22 @@ export class BCHProvider {
 
   async getBalance(address: string): Promise<Balance> {
     try {
-      const response = await fetch(`${this.getRestURL()}electrumx/balance/${address}`);
+      const base = this.getRestURL();
+      const url = `${base}electrumx/balance/${encodeURIComponent(address)}`;
+      const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch balance');
+        throw new Error(`Balance fetch failed: ${response.status}`);
       }
       
       const data = await response.json();
+      const confirmed = Number(data?.balance?.confirmed ?? data?.confirmed ?? 0) || 0;
+      const unconfirmed = Number(data?.balance?.unconfirmed ?? data?.unconfirmed ?? 0) || 0;
       
       return {
-        confirmed: data.confirmed || 0,
-        unconfirmed: data.unconfirmed || 0,
-        total: (data.confirmed || 0) + (data.unconfirmed || 0)
+        confirmed,
+        unconfirmed,
+        total: confirmed + unconfirmed
       };
     } catch (error) {
       console.error('Balance check error:', error);
@@ -567,18 +571,21 @@ export class BCHProvider {
 
   async getUTXOs(address: string): Promise<any[]> {
     try {
-      const response = await fetch(`${this.getRestURL()}blockbook/utxo/${address}`);
+      const base = this.getRestURL();
+      const url = `${base}blockbook/utxo/${encodeURIComponent(address)}`;
+      const response = await fetch(url);
       
       if (!response.ok) {
         return [];
       }
       
       const data = await response.json();
-      return Array.isArray(data) ? data.map((utxo: any) => ({
+      const list = Array.isArray(data) ? data : (data?.utxos ?? data?.data ?? []);
+      return Array.isArray(list) ? list.map((utxo: any) => ({
         txid: utxo.txid,
-        vout: utxo.vout,
-        satoshis: utxo.satoshis,
-        confirmations: utxo.confirmations
+        vout: utxo.vout ?? utxo.vOut,
+        satoshis: utxo.satoshis ?? utxo.value ?? 0,
+        confirmations: utxo.confirmations ?? 0
       })) : [];
     } catch (error) {
       console.error('UTXO fetch error:', error);
@@ -681,28 +688,27 @@ export class BCHProvider {
   }
 
   disconnect() {
+    const walletRef = this.currentWallet;
     this.connected = false;
     this.currentWallet = null;
     this.contracts = {};
     
-    // Clean up listeners if possible
-    if (this.currentWallet?.wallet && typeof this.currentWallet.wallet.removeListener === 'function') {
-      try {
-        this.currentWallet.wallet.removeListener('accountsChanged', () => {});
-        this.currentWallet.wallet.removeListener('disconnect', () => {});
-      } catch (e) {
-        // Ignore cleanup errors
+    if (typeof window !== 'undefined') {
+      if (walletRef?.wallet && typeof walletRef.wallet.removeListener === 'function') {
+        try {
+          walletRef.wallet.removeListener('accountsChanged', () => {});
+          walletRef.wallet.removeListener('disconnect', () => {});
+        } catch {
+          // Ignore cleanup errors
+        }
       }
+      localStorage.removeItem('bch_wallet_state');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('wallet_address');
+      window.dispatchEvent(new CustomEvent('walletDisconnected'));
     }
     
-    localStorage.removeItem('bch_wallet_state');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('wallet_address');
-    
     this.emit('disconnected');
-    
-    // Dispatch custom event
-    window.dispatchEvent(new CustomEvent('walletDisconnected'));
   }
 
   async reconnect(): Promise<WalletData | null> {

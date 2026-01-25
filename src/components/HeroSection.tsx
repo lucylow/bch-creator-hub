@@ -117,10 +117,19 @@ const HeroSection = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7 }}
-            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed"
+            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed"
           >
             Stop managing 10+ payment links. Collect Bitcoin Cash tips, unlocks, and subscriptions 
             with a single address that works everywhere.
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.75 }}
+            className="text-sm text-muted-foreground/90 max-w-xl mx-auto mb-12"
+          >
+            For creators, developers, artists, and entrepreneurs—blogs, YouTube, podcasts, open source, 
+            SaaS, APIs, courses, NFTs, merch, consulting, and events.
           </motion.p>
 
           <motion.div
