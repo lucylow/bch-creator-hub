@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { walletService } from '@/services/walletService';
 import { apiService } from '@/services/api';
 import { logger } from '@/utils/logger';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
 import { isDemoMode } from '@/config/demo';
 import { bchProvider } from '@/lib/web3/providers/BCHProvider';
 
@@ -16,6 +17,8 @@ interface WalletContextType {
   isConnected: boolean;
   address: string;
   balance: WalletBalance;
+  /** Last error from fetchBalance/refreshBalance, cleared on next success */
+  balanceError: string | null;
   availableWallets: string[];
   isLoading: boolean;
   walletType?: string;
@@ -40,20 +43,24 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [address, setAddress] = useState('');
   const [balance, setBalance] = useState<WalletBalance>({ confirmed: 0, unconfirmed: 0, total: 0 });
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [availableWallets, setAvailableWallets] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [walletType, setWalletType] = useState<string | undefined>();
 
   const fetchBalance = useCallback(async (addr: string) => {
     try {
+      setBalanceError(null);
       const bal = await walletService.getBalance(addr);
       setBalance({
         confirmed: bal.confirmed,
         unconfirmed: bal.unconfirmed,
-        total: bal.total || bal.confirmed + bal.unconfirmed
+        total: bal.total ?? bal.confirmed + bal.unconfirmed
       });
     } catch (error) {
-      logger.error('Failed to fetch balance', error instanceof Error ? error : new Error(String(error)), { address: addr });
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to fetch balance', err, { address: addr });
+      setBalanceError(getUserFriendlyMessage(error, 'Could not load balance'));
     }
   }, []);
 
@@ -239,7 +246,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       throw new Error(result.error || 'Authentication failed');
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to connect wallet';
+      const errorMessage = getUserFriendlyMessage(error, 'Failed to connect wallet');
       logger.error('Wallet connection failed', error instanceof Error ? error : new Error(errorMessage), { walletType });
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
@@ -282,7 +289,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       
       throw new Error(result.error || 'Payment failed');
     } catch (error) {
-      logger.error('Payment error', error instanceof Error ? error : new Error(String(error)), { toAddress, amountSats });
+      const message = getUserFriendlyMessage(error, 'Payment failed');
+      logger.error('Payment error', error instanceof Error ? error : new Error(message), { toAddress, amountSats });
       throw error;
     }
   }, [address, fetchBalance]);
@@ -297,6 +305,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     isConnected,
     address,
     balance,
+    balanceError,
     availableWallets,
     isLoading,
     walletType,
@@ -309,6 +318,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     isConnected,
     address,
     balance,
+    balanceError,
     availableWallets,
     isLoading,
     walletType,

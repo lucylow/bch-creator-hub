@@ -23,13 +23,14 @@ const footerLinks = {
 
 const Footer = () => {
   return (
-    <footer className="py-16 px-6 bg-card border-t border-border/50">
+    <footer className="relative py-20 px-6 bg-card border-t border-border/50">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden="true" />
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 text-xl font-bold mb-4">
-              <Route className="w-6 h-6 text-primary" />
+            <div className="flex items-center gap-2 font-heading text-xl font-semibold mb-4">
+              <Route className="w-6 h-6 text-primary flex-shrink-0" />
               BCH Paywall Router
             </div>
             <p className="text-muted-foreground mb-6">
@@ -53,7 +54,7 @@ const Footer = () => {
 
           {/* Product Links */}
           <div>
-            <h4 className="font-semibold mb-4">Product</h4>
+            <h4 className="font-heading font-semibold mb-4">Product</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
@@ -81,7 +82,7 @@ const Footer = () => {
 
           {/* Legal Links */}
           <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
+            <h4 className="font-heading font-semibold mb-4">Legal</h4>
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>

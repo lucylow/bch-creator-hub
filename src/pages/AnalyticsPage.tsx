@@ -42,7 +42,7 @@ const AnalyticsPage = () => {
                 </Button>
               </Link>
             </div>
-            <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
+            <h1 className="font-heading text-3xl font-bold text-foreground tracking-tight">Analytics</h1>
             <p className="text-muted-foreground">
               Track your earnings and performance
             </p>

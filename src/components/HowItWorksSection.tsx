@@ -52,8 +52,8 @@ const HowItWorksSection = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">How It Works in 3 Steps</h2>
-          <p className="text-muted-foreground text-lg">
+          <h2 className="font-heading section-title mb-4">How It Works in 3 Steps</h2>
+          <p className="text-muted-foreground text-lg leading-relaxed">
             Simple setup, powerful results. Get started in under 5 minutes.
           </p>
         </motion.div>

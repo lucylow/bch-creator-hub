@@ -4,6 +4,7 @@ import { useWallet } from './WalletContext';
 import { apiService } from '@/services/api';
 import type { Creator } from '@/types/api';
 import { logger } from '@/utils/logger';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
 
 interface CreatorContextType {
   creator: Creator | null;
@@ -72,7 +73,7 @@ export const CreatorProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       logger.error('Error loading creator profile', error instanceof Error ? error : new Error(String(error)));
       setCreator(null);
-      toast.error('Failed to load creator profile');
+      toast.error(getUserFriendlyMessage(error, 'Failed to load creator profile'));
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +111,7 @@ export const CreatorProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       logger.error('Error updating creator profile', error instanceof Error ? error : new Error(String(error)));
-      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
+      toast.error(getUserFriendlyMessage(error, 'Failed to update profile'));
       throw error;
     }
   }, [creator]);

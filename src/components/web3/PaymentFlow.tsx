@@ -1,11 +1,10 @@
 // Payment Flow component for Web3 payments
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { usePayments } from '@/lib/web3/hooks/usePayments';
 import { useWallet } from '@/contexts/WalletContext';
 import { Send, Lock, Calendar, CheckCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { formatBCH, formatUSD, generatePaymentURI, truncateAddress } from '@/lib/web3/utils/bch';
+import { formatBCH, formatUSD, generatePaymentURI, truncateAddress, getBlockExplorerUrl } from '@/lib/web3/utils/bch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +18,8 @@ interface PaymentFlowProps {
   onComplete?: (result: any) => void;
 }
 
+const BCH_NETWORK = import.meta.env.VITE_BCH_NETWORK || 'mainnet';
+
 const PaymentFlow: React.FC<PaymentFlowProps> = ({
   recipientAddress,
   amount: initialAmount,
@@ -27,7 +28,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
   onComplete
 }) => {
   const { isConnected, address, balance } = useWallet();
-  const { sendTip, unlockContent, purchaseSubscription, estimateFee, isProcessing } = usePayments();
+  const { sendTip, unlockContent, purchaseSubscription, estimateFee, estimateFeeFromServer, isProcessing } = usePayments();
   
   const [amount, setAmount] = useState(initialAmount || '');
   const [step, setStep] = useState(1);
@@ -35,12 +36,26 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
   const [txid, setTxid] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [memo, setMemo] = useState('');
+  const [serverFee, setServerFee] = useState<{ satoshis: number; percentage: string } | null>(null);
 
   useEffect(() => {
-    if (initialAmount) {
-      setAmount(initialAmount);
-    }
+    if (initialAmount) setAmount(initialAmount);
   }, [initialAmount]);
+
+  const amountSats = useMemo(() => Math.round((parseFloat(amount) || 0) * 100000000), [amount]);
+
+  useEffect(() => {
+    if (amountSats <= 0) {
+      setServerFee(null);
+      return;
+    }
+    let cancelled = false;
+    estimateFeeFromServer(amountSats).then((fee) => {
+      if (!cancelled && fee) setServerFee(fee);
+      else if (!cancelled) setServerFee(null);
+    });
+    return () => { cancelled = true; };
+  }, [amountSats, estimateFeeFromServer]);
 
   const handlePayment = async () => {
     try {
@@ -49,8 +64,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
         return;
       }
 
-      const amountSatoshis = parseFloat(amount) * 100000000;
-      
+      const amountSatoshis = amountSats;
       if (isNaN(amountSatoshis) || amountSatoshis <= 0) {
         toast.error('Please enter a valid amount');
         return;
@@ -71,7 +85,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
 
   const confirmPayment = async () => {
     try {
-      const amountSatoshis = Math.round(parseFloat(amount) * 100000000);
+      const amountSatoshis = amountSats;
       
       let result;
       
@@ -129,8 +143,8 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
   };
 
   const getFeeEstimate = () => {
-    const amountSatoshis = parseFloat(amount) * 100000000 || 0;
-    return estimateFee(amountSatoshis);
+    if (serverFee) return serverFee;
+    return estimateFee(amountSats || 0);
   };
 
   const renderStep1 = () => (
@@ -187,7 +201,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
             <div className="flex justify-between font-medium pt-2 border-t">
               <span>Total:</span>
               <span>
-                {formatBCH((parseFloat(amount) || 0) * 100000000 + getFeeEstimate().satoshis)}
+                {formatBCH(amountSats + getFeeEstimate().satoshis)}
               </span>
             </div>
           </div>
@@ -231,7 +245,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Amount:</span>
-            <span className="font-bold">{formatBCH(parseFloat(amount) * 100000000)}</span>
+            <span className="font-bold">{formatBCH(amountSats)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Fee:</span>
@@ -246,7 +260,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
           <div className="flex justify-between font-bold pt-3 border-t">
             <span>Total:</span>
             <span>
-              {formatBCH((parseFloat(amount) || 0) * 100000000 + getFeeEstimate().satoshis)}
+              {formatBCH(amountSats + getFeeEstimate().satoshis)}
             </span>
           </div>
         </CardContent>
@@ -287,7 +301,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Transaction ID:</span>
             <a
-              href={`https://blockchair.com/bitcoin-cash/transaction/${txid}`}
+              href={getBlockExplorerUrl(BCH_NETWORK, 'tx', txid)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
@@ -297,7 +311,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Amount:</span>
-            <span>{formatBCH(parseFloat(amount) * 100000000)}</span>
+            <span>{formatBCH(amountSats)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Status:</span>
@@ -359,9 +373,9 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       <QRCodeModal
         open={showQR}
         onOpenChange={setShowQR}
-        value={generatePaymentURI(recipientAddress, (parseFloat(amount) || 0) * 100000000, metadata.recipientName || '', memo)}
+        value={generatePaymentURI(recipientAddress, amountSats, metadata.recipientName || '', memo)}
         title="Scan to Pay"
-        description={`Pay ${formatBCH((parseFloat(amount) || 0) * 100000000)} to ${truncateAddress(recipientAddress)}`}
+        description={`Pay ${formatBCH(amountSats)} to ${truncateAddress(recipientAddress)}`}
         size={256}
         level="H"
       />

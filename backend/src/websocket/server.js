@@ -14,7 +14,11 @@ class WebSocketServer {
         origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
         credentials: true
       },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      pingInterval: 20_000,
+      pingTimeout: 10_000,
+      upgradeTimeout: 10_000,
+      maxHttpBufferSize: 1e6
     });
 
     this.io.on('connection', (socket) => {
@@ -196,7 +200,25 @@ class WebSocketServer {
    * Get total number of connections
    */
   getTotalConnections() {
-    return this.io.sockets.sockets.size;
+    return this.io?.sockets?.sockets?.size ?? 0;
+  }
+
+  /**
+   * Broadcast a batch of items in one message to reduce round-trips.
+   * Use for payments:batch, etc.
+   */
+  broadcastBatchToCreator(creatorId, event, items) {
+    if (!this.io) {
+      logger.warn('WebSocket server not initialized, cannot broadcast batch');
+      return;
+    }
+    if (!creatorId || typeof creatorId !== 'string' || !event || typeof event !== 'string') {
+      return;
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return;
+    }
+    this.broadcastToCreator(creatorId, event, { transactions: items });
   }
 }
 

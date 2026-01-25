@@ -21,6 +21,7 @@ import type {
 } from '@/types/api';
 import { isDemoMode } from '@/config/demo';
 import { generateMockDashboardStats, generateMockTransactions, generateMockPaymentIntents, generateMockWithdrawals } from '@/demo/mockData';
+import { normalizeError, getUserFriendlyMessage } from '@/utils/errorUtils';
 
 /**
  * Unified API Service
@@ -44,20 +45,28 @@ class ApiService {
     };
   }
 
+  /** Default request timeout in ms */
+  private static readonly REQUEST_TIMEOUT_MS = 30_000;
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), ApiService.REQUEST_TIMEOUT_MS);
+
     try {
-      const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
-      
       const response = await fetch(url, {
         ...options,
+        signal: options.signal ?? controller.signal,
         headers: {
           ...this.getHeaders(),
           ...options.headers,
         },
       });
+
+      clearTimeout(timeoutId);
 
       // Handle 401 - Unauthorized
       if (response.status === 401) {
@@ -66,31 +75,48 @@ class ApiService {
         throw new Error('Authentication expired. Please reconnect your wallet.');
       }
 
-      const data = await response.json().catch(() => ({
-        success: false,
-        error: `HTTP ${response.status}: ${response.statusText}`,
-      }));
+      const contentType = response.headers.get('content-type') ?? '';
+      let data: Record<string, unknown>;
+      if (contentType.includes('application/json')) {
+        const text = await response.text();
+        try {
+          data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+        } catch {
+          throw new Error(`Invalid JSON from server: ${response.status} ${response.statusText}`);
+        }
+      } else {
+        throw new Error(
+          response.ok
+            ? 'Server returned non-JSON response.'
+            : `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || `API error: ${response.statusText}`);
+        const msg =
+          (data.error as string) ??
+          (data.message as string) ??
+          `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(typeof msg === 'string' ? msg : 'API error');
       }
 
       // Store token if provided in response (token can be at root or in data object)
       if (data.token) {
-        localStorage.setItem('auth_token', data.token);
-      } else if (data.data && typeof data.data === 'object' && 'token' in data.data) {
-        localStorage.setItem('auth_token', data.data.token);
+        localStorage.setItem('auth_token', String(data.token));
+      } else if (data.data && typeof data.data === 'object' && data.data !== null && 'token' in data.data) {
+        const t = (data.data as Record<string, unknown>).token;
+        if (t != null) localStorage.setItem('auth_token', String(t));
       }
 
       return data as ApiResponse<T>;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Authentication expired')) {
-        throw error;
+      clearTimeout(timeoutId);
+      const normalized = normalizeError(error);
+      if (normalized.message.includes('Authentication expired')) {
+        throw normalized;
       }
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'API request failed',
-      };
+      const message = getUserFriendlyMessage(normalized, 'API request failed');
+      return { success: false, error: message };
     }
   }
 

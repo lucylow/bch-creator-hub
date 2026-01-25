@@ -1,9 +1,10 @@
 // Network configurations for testnet and mainnet
+// Testnet uses tapi.fullstack.cash; mainnet uses api.fullstack.cash
 const NETWORK_CONFIGS = {
   testnet: {
     name: 'testnet',
-    restUrl: 'https://api.fullstack.cash/v5/',
-    wssUrl: 'wss://api.fullstack.cash/v5/',
+    restUrl: 'https://tapi.fullstack.cash/v5/',
+    wssUrl: 'wss://tapi.fullstack.cash/v5/',
     explorerUrl: 'https://www.blockchain.com/bch-testnet',
     zmqUrl: process.env.ZMQ_URL || 'tcp://127.0.0.1:28332',
     chainId: 'bchtest',

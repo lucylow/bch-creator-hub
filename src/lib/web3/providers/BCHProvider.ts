@@ -1,5 +1,6 @@
 // BCH Provider - Core Web3 integration layer
 import { API } from '../api/client';
+import { getBlockExplorerUrl } from '../utils/bch';
 
 interface WalletInfo {
   name: string;
@@ -756,6 +757,16 @@ export class BCHProvider {
 
   getNetwork(): string {
     return this.network;
+  }
+
+  /** Network-aware block explorer URL for a transaction (mainnet/testnet/regtest). */
+  getBlockExplorerTxUrl(txid: string): string {
+    return getBlockExplorerUrl(this.network, 'tx', txid);
+  }
+
+  /** Network-aware block explorer URL for an address. */
+  getBlockExplorerAddressUrl(address: string): string {
+    return getBlockExplorerUrl(this.network, 'address', address);
   }
 
   isConnected(): boolean {

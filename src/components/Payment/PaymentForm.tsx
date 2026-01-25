@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatBCH, validateBCHAddress, calculateFee } from '@/utils/formatters';
 import { logger } from '@/utils/logger';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
 
 type PaymentDetails = {
   recipient?: string;
@@ -82,7 +83,7 @@ const PaymentForm: React.FC<Props> = ({
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error('Payment form submission failed', error);
-      toast.error(error.message || 'Payment failed');
+      toast.error(getUserFriendlyMessage(err, 'Payment failed'));
     }
   };
 

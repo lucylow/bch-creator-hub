@@ -136,6 +136,20 @@ class Transaction {
     return result.rows[0];
   }
 
+  /**
+   * Get distinct creator IDs that have transactions in a given block.
+   * Used for batched balance updates after block processing.
+   */
+  static async getCreatorIdsByBlock(blockHeight) {
+    if (blockHeight == null || blockHeight <= 0) return [];
+    const result = await query(
+      `SELECT DISTINCT creator_id FROM transactions 
+       WHERE block_height = $1`,
+      [blockHeight]
+    );
+    return (result.rows || []).map((r) => r.creator_id);
+  }
+
   static async getStats(creatorId, startDate, endDate) {
     const result = await query(
       `SELECT 

@@ -64,7 +64,7 @@ const Navbar = () => {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="fixed top-0 w-full z-50 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl bg-background/80 border-b border-border/50 shadow-sm"
+      className="fixed top-0 w-full z-50 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl bg-background/90 border-b border-border/50 shadow-sm"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link 
@@ -77,7 +77,7 @@ const Navbar = () => {
           >
             <Route className="w-7 h-7 text-primary" />
           </motion.div>
-          <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          <span className="font-heading font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             BCH Paywall Router
           </span>
         </Link>

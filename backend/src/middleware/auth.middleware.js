@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const Creator = require('../models/Creator');
+const creatorSessionCache = require('../services/creatorSessionCache.service');
 const bip322 = require('../utils/bip322');
+const { getJwtSecret } = require('../config/security');
 
 const authenticateWallet = async (req, res, next) => {
   try {
@@ -47,8 +49,8 @@ const authenticateWallet = async (req, res, next) => {
         address: creator.wallet_address,
         isVerified: creator.is_verified
       },
-      process.env.JWT_SECRET || 'hackathon-secret-key',
-      { expiresIn: '7d' }
+      getJwtSecret(),
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d', algorithm: 'HS256' }
     );
 
     req.creator = creator;
@@ -79,10 +81,11 @@ const verifyToken = async (req, res, next) => {
     
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || 'hackathon-secret-key'
+      getJwtSecret(),
+      { algorithms: ['HS256'] }
     );
 
-    const creator = await Creator.findByCreatorId(decoded.creatorId);
+    const creator = await creatorSessionCache.getCreator(decoded.creatorId);
     
     if (!creator || !creator.is_active) {
       return res.status(401).json({
@@ -122,21 +125,44 @@ const apiLimiter = rateLimiter({
   legacyHeaders: false,
 });
 
+// Stricter rate limit for auth endpoints (login/challenge)
+const authLimiter = rateLimiter({
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 20,
+  message: { success: false, error: 'Too many authentication attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // Specific rate limit for payment endpoints
 const paymentLimiter = rateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 requests per minute
-  message: {
-    success: false,
-    error: 'Too many payment attempts, please slow down.'
-  }
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.PAYMENT_RATE_LIMIT_MAX) || 10,
+  message: { success: false, error: 'Too many payment attempts, please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
+
+// Rate limit for withdrawal/contract withdraw
+const withdrawalLimiter = rateLimiter({
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.WITHDRAWAL_RATE_LIMIT_MAX) || 5,
+  message: { success: false, error: 'Too many withdrawal attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Alias for routes that use this name
+const authenticateCreator = verifyToken;
 
 module.exports = {
   authenticateWallet,
   verifyToken,
+  authenticateCreator,
   apiLimiter,
-  paymentLimiter
+  authLimiter,
+  paymentLimiter,
+  withdrawalLimiter
 };
 
 

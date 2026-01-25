@@ -59,7 +59,7 @@ const CreateLinkPage = () => {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Create Payment Link</h1>
+            <h1 className="font-heading text-3xl font-bold text-foreground tracking-tight">Create Payment Link</h1>
             <p className="text-muted-foreground">
               Set up a new way to receive BCH payments
             </p>

@@ -4,6 +4,11 @@ import { useWallet } from '@/contexts/WalletContext';
 import { API } from '../api/client';
 import { toast } from 'sonner';
 
+const defaultTxSize = { inputs: 1, outputs: 2, overhead: 10 };
+const bytesPerInput = 148;
+const bytesPerOutput = 34;
+const defaultFeePerByte = 1.0;
+
 export const usePayments = () => {
   const { isConnected, address, sendPayment } = useWallet();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -98,24 +103,50 @@ export const usePayments = () => {
   }, [isConnected, sendPayment]);
 
   const estimateFee = useCallback((amountSatoshis: number, numInputs = 1, numOutputs = 2) => {
-    // Simple fee estimation
-    const typicalTxSize = 226;
-    const estimatedSize = (numInputs * 148) + (numOutputs * 34) + 10;
-    const feePerByte = 1.0; // satoshis per byte
-    const fee = Math.ceil(estimatedSize * feePerByte);
-    
+    const estimatedSize = numInputs * bytesPerInput + numOutputs * bytesPerOutput + defaultTxSize.overhead;
+    const fee = Math.ceil(estimatedSize * defaultFeePerByte);
+    const safeAmount = Math.max(amountSatoshis, 1);
     return {
       satoshis: fee,
-      percentage: ((fee / amountSatoshis) * 100).toFixed(2)
+      percentage: ((fee / safeAmount) * 100).toFixed(2),
     };
   }, []);
+
+  /** Fetch fee estimate from backend when API is available (public endpoint, no auth). */
+  const estimateFeeFromServer = useCallback(
+    async (amountSatoshis: number, numInputs = 1, numOutputs = 2): Promise<{ satoshis: number; percentage: string } | null> => {
+      try {
+        const params = new URLSearchParams({
+          numInputs: String(numInputs),
+          numOutputs: String(numOutputs),
+          amountSats: String(amountSatoshis),
+        });
+        const res = await API.get<{ sats: number; feePerByte?: number; size?: number }>(
+          `payments/fee/estimate?${params}`
+        );
+        if (res.success && res.data && typeof (res.data as { sats?: number }).sats === 'number') {
+          const d = res.data as { sats: number };
+          const safeAmount = Math.max(amountSatoshis, 1);
+          return {
+            satoshis: d.sats,
+            percentage: ((d.sats / safeAmount) * 100).toFixed(2),
+          };
+        }
+      } catch {
+        // ignore; caller falls back to local estimate
+      }
+      return null;
+    },
+    []
+  );
 
   return {
     sendTip,
     unlockContent,
     purchaseSubscription,
     estimateFee,
-    isProcessing
+    estimateFeeFromServer,
+    isProcessing,
   };
 };
 

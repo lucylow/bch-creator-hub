@@ -37,7 +37,7 @@ const WaitlistSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Join the Creator Economy Revolution</h2>
+          <h2 className="font-heading section-title mb-4">Join the Creator Economy Revolution</h2>
           <p className="text-muted-foreground text-lg mb-8">
             Be among the first 500 creators to get lifetime 0.5% fees. Limited spots available.
           </p>

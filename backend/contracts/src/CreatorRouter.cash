@@ -59,8 +59,8 @@ contract CreatorRouter {
         require(tx.time >= this.lastWithdrawalTime + this.minWithdrawalTime, 
             "Too soon since last withdrawal");
         
-        // Calculate total balance
-        int totalBalance = tx.value;
+        // Use active contract input value (not total tx value)
+        int totalBalance = tx.inputs[this.activeInputIndex].value;
         
         // Calculate fee and amounts
         int serviceFee = 0;
@@ -117,7 +117,8 @@ contract CreatorRouter {
     function withdrawAmount(sig creatorSig, int amount) {
         require(checkSig(creatorSig, this.creatorPubKey));
         require(tx.time >= this.lastWithdrawalTime + this.minWithdrawalTime);
-        require(amount > 0 && amount <= tx.value, "Invalid amount");
+        int inputValue = tx.inputs[this.activeInputIndex].value;
+        require(amount > 0 && amount <= inputValue, "Invalid amount");
         
         // Calculate fee on withdrawn amount only
         int serviceFee = 0;
@@ -171,8 +172,9 @@ contract CreatorRouter {
             "Emergency withdrawal not available yet");
         
         // No service fee in emergency withdrawal
+        int inputValue = tx.inputs[this.activeInputIndex].value;
         require(tx.outputs.length == 1, "Expected 1 output");
-        require(tx.outputs[0].value >= tx.value, "Insufficient amount");
+        require(tx.outputs[0].value >= inputValue, "Insufficient amount");
         require(hash160(this.creatorPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript),
             "Output doesn't match creatorPubKey");
     }
@@ -208,9 +210,8 @@ contract CreatorRouter {
         // Anyone can send funds to this contract
         // The data parameter contains OP_RETURN payload for backend indexing
         // No validation needed in contract - just accept payment
-        
-        // Minimal validation to prevent spam
-        require(tx.value >= DUST_LIMIT, "Payment below dust limit");
+        // Use active input value for payment amount
+        require(tx.inputs[this.activeInputIndex].value >= DUST_LIMIT, "Payment below dust limit");
     }
     
     /**

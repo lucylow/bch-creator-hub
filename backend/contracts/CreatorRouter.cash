@@ -17,6 +17,9 @@ contract CreatorRouter(
   bool hasService
 ) {
 
+  // BCH dust limit (minimum output size)
+  int constant DUST_LIMIT = 546;
+
   // withdraw() - creator signs to authorize a spending transaction
   // The calling transaction must:
   //  - spend the contract UTXO as the active input (default in SDK)
@@ -45,6 +48,7 @@ contract CreatorRouter(
     // ensure first output pays creator and at least expected payout (allow miner allowance)
     int minerAllowance = 1000; // sats allowed to cover miner fees / change handling (tune per your UX)
     int expectedPayoutMin = currentValue - serviceSats - minerAllowance;
+    require(expectedPayoutMin >= DUST_LIMIT, "Creator payout below dust");
 
     // Basic checks for payout output
     require(tx.outputs[0].lockingBytecode == payoutLocking);

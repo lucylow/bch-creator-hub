@@ -6,6 +6,7 @@ const { validatePaymentIntent, validateTransaction, validateIntentId } = require
 
 // Public routes (no auth required)
 router.get('/intent/:intentId', validateIntentId, paymentController.getIntent);
+router.get('/fee/estimate', paymentController.estimateFee);
 
 // Protected routes (require auth)
 router.use(verifyToken);
@@ -27,9 +28,6 @@ router.post('/link', paymentController.generatePaymentLink);
 
 // Get payment status (public)
 router.get('/status/:txid', paymentController.getPaymentStatus);
-
-// Estimate payment fee (public)
-router.get('/fee/estimate', paymentController.estimateFee);
 
 // Get payment stats (protected)
 router.get('/stats', paymentController.getPaymentStats);

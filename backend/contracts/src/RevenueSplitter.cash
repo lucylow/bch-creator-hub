@@ -17,6 +17,9 @@ pragma cashscript ^0.10.0;
 
 contract RevenueSplitter(bytes20 creatorPkh, bytes20 servicePkh, pubkey creatorPubKey, int feeBps) {
 
+  // Minimum output (BCH dust limit)
+  int constant DUST_LIMIT = 546;
+
   function withdraw(sig creatorSig) {
     // 1) verify creator signature
     require(checkSig(creatorSig, creatorPubKey));
@@ -31,12 +34,13 @@ contract RevenueSplitter(bytes20 creatorPkh, bytes20 servicePkh, pubkey creatorP
     // 4) compute service cut (integer math)
     int serviceSats = (inputValue * feeBps) / 10000;
 
-    // 5) allow small miner allowance to let builders include fee/change (tune as needed)
+    // 5) allow small miner allowance so builders can include fee/change
     int minerAllowance = 1000;
 
-    // 6) expected minimum creator payout
+    // 6) expected minimum creator payout; enforce dust limit
     int expectedCreatorMin = inputValue - serviceSats - minerAllowance;
     require(expectedCreatorMin >= 0);
+    require(expectedCreatorMin >= DUST_LIMIT, "Creator payout below dust");
 
     // 7) verify output[0] pays creator P2PKH with enough sats
     bytes creatorLocking = new LockingBytecodeP2PKH(creatorPkh);

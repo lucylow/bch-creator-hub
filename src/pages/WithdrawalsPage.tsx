@@ -79,7 +79,7 @@ const WithdrawalsPage = () => {
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-foreground mb-1">Withdrawals</h1>
+              <h1 className="font-heading text-3xl font-bold text-foreground tracking-tight mb-1">Withdrawals</h1>
               <p className="text-muted-foreground flex items-center gap-2">
                 Manage your BCH withdrawals
                 <LiveIndicator isLive={pendingWithdrawals.length > 0} label={pendingWithdrawals.length > 0 ? 'Processing' : ''} size="sm" />

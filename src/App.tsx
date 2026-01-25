@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { CreatorProvider } from "@/contexts/CreatorContext";
+import { LiveTransactionsProviderFromCreator } from "@/contexts/LiveTransactionsContext";
 import { EVMProvider } from "@/lib/web3/providers/EVMProvider";
 import ErrorBoundary from "@/components/Common/ErrorBoundary";
 import Index from "./pages/Index";
@@ -43,11 +44,19 @@ const App = () => (
         <EVMProvider>
           <WalletProvider>
             <CreatorProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
+              <LiveTransactionsProviderFromCreator>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                <a
+                  href="#main-content"
+                  className="absolute -left-[9999px] z-[100] px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium focus:fixed focus:left-4 focus:top-4 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
+                >
+                  Skip to main content
+                </a>
                 <AppNavigation />
                 <PageTransition>
+                <main id="main-content" className="min-h-screen" role="main">
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
@@ -60,11 +69,13 @@ const App = () => (
                   <Route path="/withdrawals" element={<WithdrawalsPage />} />
                   <Route path="/supporters" element={<SupportersPage />} />
                   <Route path="/help" element={<HelpPage />} />
-                  <Route path="/pay/:creatorId" element={<PaymentPage />} />
+                  <Route path="/pay/:creatorId/:paymentId?" element={<PaymentPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                </main>
                 </PageTransition>
-              </BrowserRouter>
+                </BrowserRouter>
+              </LiveTransactionsProviderFromCreator>
             </CreatorProvider>
           </WalletProvider>
         </EVMProvider>

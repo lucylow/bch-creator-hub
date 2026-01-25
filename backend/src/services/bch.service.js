@@ -1,9 +1,41 @@
 const BCHJS = require('@psf/bch-js');
-const axios = require('axios');
 const logger = require('../utils/logger');
-const { ExternalServiceError, AppError } = require('../utils/errors');
-
+const { ExternalServiceError } = require('../utils/errors');
+const { retry } = require('../utils/retry');
 const bchConfig = require('../config/bch');
+
+const SATS_PER_BCH = 100_000_000;
+const DEFAULT_RETRY_OPTIONS = {
+  maxRetries: 3,
+  initialDelay: 100,
+  maxDelay: 2000,
+  timeout: 15000,
+  context: 'BCH'
+};
+
+function isRetryableBchError(error) {
+  return (
+    error.code === 'ECONNREFUSED' ||
+    error.code === 'ETIMEDOUT' ||
+    error.code === 'ENOTFOUND' ||
+    error.code === 'ECONNRESET' ||
+    (error.response && error.response.status >= 500)
+  );
+}
+
+function wrapBchError(operation, detail, error, context = {}) {
+  const retryable = isRetryableBchError(error);
+  logger.error(`${operation} error:`, {
+    ...context,
+    message: error.message,
+    code: error.code,
+    status: error.response?.status
+  });
+  return new ExternalServiceError('BCH Service', `${detail}: ${error.message}`, {
+    context: { ...context },
+    retryable
+  });
+}
 
 class BCHService {
   constructor() {
@@ -11,66 +43,60 @@ class BCHService {
       restURL: bchConfig.restUrl,
       apiToken: bchConfig.apiToken
     });
-    
     this.network = bchConfig.network;
-    this.feePerByte = 1.0; // satoshis per byte
+    this.feePerByte = 1.0;
   }
 
-  // Validate BCH address
+  /**
+   * Health check: verify backend connectivity (block height fetch).
+   * @returns {{ ok: boolean, blockHeight?: number, latencyMs?: number, error?: string }}
+   */
+  async checkHealth() {
+    const start = Date.now();
+    try {
+      const blockHeight = await this.getBlockHeight();
+      return { ok: true, blockHeight, latencyMs: Date.now() - start };
+    } catch (error) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - start,
+        error: error.message || 'BCH backend unavailable'
+      };
+    }
+  }
+
   validateAddress(address) {
+    if (!address || typeof address !== 'string') return false;
     try {
       return this.bchjs.Address.isCashAddress(address);
     } catch (error) {
-      logger.error('Address validation error:', error);
+      logger.error('Address validation error:', { address, error: error.message });
       return false;
     }
   }
 
-  // Get address balance
   async getBalance(address, retries = 3) {
-    let lastError;
-    
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
+    if (!address || typeof address !== 'string') {
+      throw new ExternalServiceError('BCH Service', 'Address is required', { context: { address }, retryable: false });
+    }
+    return retry(
+      async () => {
         const balance = await this.bchjs.Electrumx.balance(address);
-        
         return {
           confirmed: balance.balance.confirmed,
           unconfirmed: balance.balance.unconfirmed,
           total: balance.balance.confirmed + balance.balance.unconfirmed
         };
-      } catch (error) {
-        lastError = error;
-        
-        // Check if error is retryable
-        const isRetryable = error.code === 'ECONNREFUSED' || 
-                           error.code === 'ETIMEDOUT' || 
-                           error.code === 'ENOTFOUND' ||
-                           error.response?.status >= 500;
-        
-        if (!isRetryable || attempt === retries) {
-          logger.error('Balance check error:', {
-            address,
-            attempt,
-            error: {
-              message: error.message,
-              code: error.code,
-              status: error.response?.status
-            }
-          });
-          throw new ExternalServiceError('BCH Service', `Failed to get balance for ${address}: ${error.message}`, {
-            context: { address, attempts: attempt },
-            retryable: isRetryable
-          });
-        }
-        
-        // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
-        logger.warn(`Balance check retry ${attempt}/${retries} for ${address}`);
+      },
+      {
+        ...DEFAULT_RETRY_OPTIONS,
+        maxRetries: retries,
+        shouldRetry: isRetryableBchError,
+        context: `balance:${address.slice(0, 12)}`
       }
-    }
-    
-    throw lastError;
+    ).catch((error) => {
+      throw wrapBchError('Balance check', `Failed to get balance for ${address}`, error, { address });
+    });
   }
 
   // Decode OP_RETURN data
@@ -136,54 +162,33 @@ class BCHService {
     }
   }
 
-  // Get transaction details
   async getTransaction(txid, retries = 3) {
-    let lastError;
-    
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const tx = await this.bchjs.Blockbook.tx(txid);
-        return tx;
-      } catch (error) {
-        lastError = error;
-        
-        const isRetryable = error.code === 'ECONNREFUSED' || 
-                           error.code === 'ETIMEDOUT' || 
-                           error.response?.status >= 500;
-        
-        if (!isRetryable || attempt === retries) {
-          logger.error(`Error fetching transaction ${txid}:`, {
-            txid,
-            attempt,
-            error: {
-              message: error.message,
-              code: error.code,
-              status: error.response?.status
-            }
-          });
-          throw new ExternalServiceError('BCH Service', `Failed to get transaction ${txid}: ${error.message}`, {
-            context: { txid, attempts: attempt },
-            retryable: isRetryable
-          });
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
-        logger.warn(`Transaction fetch retry ${attempt}/${retries} for ${txid}`);
-      }
+    if (!txid || typeof txid !== 'string') {
+      throw new ExternalServiceError('BCH Service', 'Transaction ID is required', { context: { txid }, retryable: false });
     }
-    
-    throw lastError;
+    return retry(
+      () => this.bchjs.Blockbook.tx(txid),
+      {
+        ...DEFAULT_RETRY_OPTIONS,
+        maxRetries: retries,
+        shouldRetry: isRetryableBchError,
+        context: `tx:${txid.slice(0, 12)}`
+      }
+    ).catch((error) => {
+      throw wrapBchError('Transaction fetch', `Failed to get transaction ${txid}`, error, { txid });
+    });
   }
 
-  // Get current block height
   async getBlockHeight() {
-    try {
-      const info = await this.bchjs.Blockbook.blockchainInfo();
-      return info.blocks;
-    } catch (error) {
-      logger.error('Error getting block height:', error);
-      throw error;
-    }
+    return retry(
+      async () => {
+        const info = await this.bchjs.Blockbook.blockchainInfo();
+        return info.blocks;
+      },
+      { ...DEFAULT_RETRY_OPTIONS, context: 'blockHeight' }
+    ).catch((error) => {
+      throw wrapBchError('Block height', 'Failed to get block height', error);
+    });
   }
 
   // Estimate transaction fee

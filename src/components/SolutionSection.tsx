@@ -25,8 +25,8 @@ const SolutionSection = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">The Bitcoin Cash Solution</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+          <h2 className="font-heading section-title mb-4">The Bitcoin Cash Solution</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
             A protocol-first approach that puts creators back in control of their monetization.
           </p>
         </motion.div>
@@ -76,7 +76,7 @@ const SolutionSection = () => {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <h3 className="text-2xl sm:text-3xl font-bold mb-6">Unified Payment Layer</h3>
+            <h3 className="font-heading text-2xl sm:text-3xl font-bold mb-6">Unified Payment Layer</h3>
             <p className="text-muted-foreground mb-8">
               We deploy a smart contract on Bitcoin Cash that becomes your permanent payment address. 
               Every tip, unlock, or subscription goes to this single address, while our system 

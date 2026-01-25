@@ -95,7 +95,7 @@ const SupportersPage = () => {
                 </Button>
               </Link>
             </div>
-            <h1 className="text-4xl font-bold text-foreground mb-2">Supporters</h1>
+            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground tracking-tight mb-2">Supporters</h1>
             <p className="text-muted-foreground text-lg">
               View your community and top supporters
             </p>

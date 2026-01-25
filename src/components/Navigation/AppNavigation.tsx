@@ -19,6 +19,7 @@ const navLinks = [
   { path: '/supporters', label: 'Supporters', icon: Users, exact: true },
   { path: '/analytics', label: 'Analytics', icon: BarChart2, exact: true },
   { path: '/settings', label: 'Settings', icon: Settings, exact: true },
+  { path: '/help', label: 'Help', icon: HelpCircle, exact: true },
 ];
 
 const AppNavigation = () => {
@@ -78,16 +79,16 @@ const AppNavigation = () => {
 
   return (
     <>
-      <nav className="fixed top-0 w-full z-50 px-6 py-4 backdrop-blur-md bg-background/95 border-b border-border/50">
+      <nav className="fixed top-0 w-full z-50 px-6 py-4 backdrop-blur-xl bg-background/90 border-b border-border/50 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-foreground hover:opacity-80 transition-opacity">
-            <Route className="w-7 h-7 text-primary" />
+          <Link to="/" className="flex items-center gap-2 font-heading text-xl font-semibold text-foreground hover:opacity-80 transition-opacity">
+            <Route className="w-7 h-7 text-primary flex-shrink-0" />
             <span className="hidden sm:inline">BCHRouter</span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-2">
-            {isConnected && navLinks.map((link) => {
+            {(isConnected ? navLinks : [{ path: '/dashboard', label: 'Dashboard', icon: Home, exact: true }, { path: '/help', label: 'Help', icon: HelpCircle, exact: true }]).map((link) => {
               const isActive = isActiveRoute(link.path, link.exact ?? false);
               return (
                 <NavLink
@@ -228,8 +229,32 @@ const AppNavigation = () => {
                     </div>
                   </>
                 ) : (
-                  <div className="pt-8">
-                    <WalletConnectButton fullWidth />
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      {[{ path: '/dashboard', label: 'Dashboard', icon: Home, exact: true }, { path: '/help', label: 'Help', icon: HelpCircle, exact: true }].map((link) => {
+                        const isActive = isActiveRoute(link.path, link.exact ?? false);
+                        return (
+                          <NavLink
+                            key={link.path}
+                            to={link.path}
+                            end={link.exact}
+                            onClick={() => setIsOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 px-4 py-3 rounded-lg transition-all',
+                              'text-muted-foreground hover:bg-muted',
+                              isActive && 'bg-primary/10 text-primary font-medium'
+                            )}
+                          >
+                            <link.icon className="w-5 h-5 flex-shrink-0" />
+                            <span>{link.label}</span>
+                            {isActive && <ChevronRight className="w-4 h-4 ml-auto text-primary" />}
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                    <div className="pt-4 border-t border-border">
+                      <WalletConnectButton fullWidth />
+                    </div>
                   </div>
                 )}
               </div>

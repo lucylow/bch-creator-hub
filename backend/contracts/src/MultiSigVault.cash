@@ -61,8 +61,7 @@ contract MultiSigVault {
         require(sigs.length == pubkeys.length, "Signature/pubkey count mismatch");
         require(sigs.length >= threshold, "Insufficient signatures");
         
-        // Verify all signatures
-        bytes32 sighash = tx.hash;
+        int inputValue = tx.inputs[this.activeInputIndex].value;
         int validSigs = 0;
         
         for (int i = 0; i < sigs.length; i++) {
@@ -85,11 +84,11 @@ contract MultiSigVault {
         
         require(validSigs >= threshold, "Not enough valid signatures");
         
-        // Verify withdrawal amount
-        require(amount >= DUST_LIMIT && amount <= tx.value, "Invalid amount");
+        // Verify withdrawal amount (use active input value)
+        require(amount >= DUST_LIMIT && amount <= inputValue, "Invalid amount");
         
         // Verify outputs
-        if (amount == tx.value) {
+        if (amount == inputValue) {
             // Full withdrawal
             require(tx.outputs.length == 1, "Expected 1 output");
             require(tx.outputs[0].value >= amount, "Insufficient amount");
@@ -105,17 +104,19 @@ contract MultiSigVault {
                 "Invalid change output");
         }
         
-        // Update last withdrawal time
-        lastWithdrawalTime = tx.time;
+        // lastWithdrawalTime is not persisted on-chain; off-chain indexer tracks it
+        // for emergencyWithdraw the caller must pass lastWithdrawalTime as argument
     }
     
     /**
      * @notice Emergency withdrawal with single signature after delay
-     * @dev Any signer can withdraw after emergencyDelay of inactivity
+     * @dev Any signer can withdraw after emergencyDelay of inactivity.
+     *      lastWithdrawalTime must be provided by caller (from indexer/backend).
      * @param sig Signer's signature
      * @param signerPubKey Signer's public key
+     * @param lastWithdrawalTime Unix time of last withdrawal (from indexer)
      */
-    function emergencyWithdraw(sig sig, pubkey signerPubKey) {
+    function emergencyWithdraw(sig sig, pubkey signerPubKey, int lastWithdrawalTime) {
         // Verify signer is authorized
         bool isSigner = false;
         for (int i = 0; i < signers.length; i++) {
@@ -129,13 +130,14 @@ contract MultiSigVault {
         // Verify signature
         require(checkSig(sig, signerPubKey));
         
-        // Check emergency delay
+        // Check emergency delay (stateless: caller provides last withdrawal time)
         require(tx.time >= lastWithdrawalTime + emergencyDelay,
             "Emergency withdrawal not available yet");
         
+        int inputValue = tx.inputs[this.activeInputIndex].value;
         // Full withdrawal only in emergency
         require(tx.outputs.length == 1, "Expected 1 output");
-        require(tx.outputs[0].value >= tx.value, "Insufficient amount");
+        require(tx.outputs[0].value >= inputValue, "Insufficient amount");
         
         // Must go to the emergency withdrawer
         require(hash160(signerPubKey) == extractPubKeyHash(tx.outputs[0].lockingScript),

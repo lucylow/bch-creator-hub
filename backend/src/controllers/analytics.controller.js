@@ -1,6 +1,7 @@
 const Creator = require('../models/Creator');
 const Transaction = require('../models/Transaction');
 const PaymentIntent = require('../models/PaymentIntent');
+const balanceCache = require('../services/balanceCache.service');
 
 class AnalyticsController {
   // Get comprehensive analytics
@@ -29,7 +30,7 @@ class AnalyticsController {
       }
 
       const [balance, creatorStats, transactionStats, paymentIntentStats] = await Promise.all([
-        Creator.getBalance(creatorId),
+        balanceCache.getBalance(creatorId),
         Creator.getStats(creatorId, startDate, period === 'all' ? null : new Date()),
         Transaction.getStats(creatorId, startDate, period === 'all' ? null : new Date()),
         PaymentIntent.getStats(creatorId)

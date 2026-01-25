@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const bip322 = require('../utils/bip322');
 const Creator = require('../models/Creator');
 const { ValidationError, AuthenticationError } = require('../utils/errors');
+const { getJwtSecret, getJwtExpiresIn } = require('../config/security');
+const AuditService = require('../services/audit.service');
 
 class AuthController {
   // Wallet authentication
@@ -16,6 +18,11 @@ class AuthController {
       // Verify signature
       const isValid = await bip322.verifySignature(address, message, signature);
       if (!isValid) {
+        AuditService.logAuthFailure({
+          reason: 'invalid_signature',
+          addressHint: address,
+          requestId: req.id
+        });
         throw new AuthenticationError('Invalid signature');
       }
 
@@ -43,9 +50,14 @@ class AuthController {
           address: creator.wallet_address,
           isVerified: creator.is_verified
         },
-        process.env.JWT_SECRET || 'hackathon-secret-key',
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        getJwtSecret(),
+        { expiresIn: getJwtExpiresIn(), algorithm: 'HS256' }
       );
+
+      AuditService.logAuthSuccess({
+        creatorId: creator.creator_id,
+        addressHint: creator.wallet_address
+      });
 
       res.json({
         success: true,

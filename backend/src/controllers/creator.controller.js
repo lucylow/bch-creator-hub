@@ -1,6 +1,7 @@
 const Creator = require('../models/Creator');
 const Transaction = require('../models/Transaction');
 const ContractService = require('../services/contract.service');
+const balanceCache = require('../services/balanceCache.service');
 const { validationResult } = require('express-validator');
 const { ValidationError, AppError } = require('../utils/errors');
 
@@ -10,8 +11,8 @@ class CreatorController {
     try {
       const creator = req.creator;
       
-      // Get balance
-      const balance = await Creator.getBalance(creator.creator_id);
+      // Get balance (cache-aside via Redis)
+      const balance = await balanceCache.getBalance(creator.creator_id);
       
       // Get stats
       const stats = await Creator.getStats(creator.creator_id);
@@ -49,6 +50,7 @@ class CreatorController {
       if (twitterHandle) updates.twitter_handle = twitterHandle;
 
       const updatedCreator = await Creator.update(creatorId, updates);
+      await creatorSessionCache.invalidateCreator(creatorId);
 
       res.json({
         success: true,
@@ -113,7 +115,7 @@ class CreatorController {
       }
 
       const [balance, stats, recentTransactions] = await Promise.all([
-        Creator.getBalance(creatorId),
+        balanceCache.getBalance(creatorId),
         Creator.getStats(creatorId, startDate, new Date()),
         Transaction.getRecentByCreator(creatorId, 10)
       ]);

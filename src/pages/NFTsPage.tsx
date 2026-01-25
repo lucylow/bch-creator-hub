@@ -27,7 +27,7 @@ export default function NFTsPage() {
             </Button>
           </Link>
         </div>
-        <h1 className="text-4xl font-bold mb-2">NFT Marketplace</h1>
+        <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-2">NFT Marketplace</h1>
         <p className="text-muted-foreground mb-4">
           Mint, buy, and manage your NFTs on the BCH Creator Hub
         </p>

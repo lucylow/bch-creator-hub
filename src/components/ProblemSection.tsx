@@ -21,7 +21,7 @@ const problems = [
 
 const ProblemSection = () => {
   return (
-    <section id="problem" className="py-24 px-6">
+    <section id="problem" className="py-28 px-6 bg-background">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -29,8 +29,8 @@ const ProblemSection = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">The Creator Payment Crisis</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+          <h2 className="font-heading section-title mb-4">The Creator Payment Crisis</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
             Content creators lose hours and hundreds of dollars every month managing fragmented payment systems.
           </p>
         </motion.div>

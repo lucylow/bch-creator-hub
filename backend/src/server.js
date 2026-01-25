@@ -1,8 +1,11 @@
 require('dotenv').config();
 const http = require('http');
+const { assertProductionSecrets } = require('./config/security');
 const App = require('./app');
 const logger = require('./utils/logger');
 const WebSocketServer = require('./websocket/server');
+
+assertProductionSecrets();
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {

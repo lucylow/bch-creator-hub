@@ -86,7 +86,7 @@ Multi-signature vault for creator teams. Requires M-of-N signatures for withdraw
 
 **Functions:**
 - `withdraw(sig[] sigs, pubkey[] pubkeys, bytes20 to, int amount)`: Standard withdrawal
-- `emergencyWithdraw(sig sig, pubkey signerPubKey)`: Emergency withdrawal
+- `emergencyWithdraw(sig sig, pubkey signerPubKey, int lastWithdrawalTime)`: Emergency withdrawal after delay. `lastWithdrawalTime` must be provided by the caller (from indexer/backend) because contract state is not persisted on-chain.
 - `addSigner(...)`: Add new signer (requires all current signers)
 - `removeSigner(...)`: Remove signer (requires all other signers)
 - `updateThreshold(...)`: Update threshold (requires all signers)
@@ -236,9 +236,17 @@ Set the following in your `.env` file:
 BCH_NETWORK=testnet  # or mainnet
 ```
 
+## Contract improvements (recent)
+
+- **Value semantics**: All contracts that move funds use `tx.inputs[this.activeInputIndex].value` for the amount (instead of `tx.value`), so behavior is correct when the contract UTXO is one of several inputs.
+- **Dust limits**: CreatorRouter (root), RevenueSplitter, and creator payouts enforce the BCH dust limit (546 sats) where relevant.
+- **MultiSigVault**: Emergency withdrawal is stateless: `emergencyWithdraw(sig, signerPubKey, lastWithdrawalTime)` takes `lastWithdrawalTime` from the indexer/backend, since contract state is not persisted on-chain. Removed use of non-existent `tx.hash`.
+- **PaymentSplitter**: `getInfo()` no longer mutates recipient state when encoding; buffer size fixed to `3 + n*26`. Distribution skips recipients whose share is below `minPayment` (amount stays in contract) instead of over-allocating.
+- **PaymentSplitter**: `distribute()` and `emergencyRedistribute()` use the active contract input value.
+
 ## Notes
 
-- Contracts use CashScript version ^0.9.0
+- Contracts use CashScript version ^0.9.0 or ^0.10.0 (see pragma in each file)
 - All amounts are in satoshis
 - Time values are Unix timestamps in seconds
 - Fees are specified in basis points (100 = 1%)

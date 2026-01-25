@@ -14,9 +14,11 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import QuickActions from '@/components/Dashboard/QuickActions';
 import BalanceChart from '@/components/Dashboard/BalanceChart';
 import LiveFeed from '@/components/Dashboard/LiveFeed';
-import LoadingSpinner from '@/components/Common/LoadingSpinner';
+import DashboardSkeleton from '@/components/Common/DashboardSkeleton';
 import Breadcrumbs from '@/components/Common/Breadcrumbs';
+import WalletConnectButton from '@/components/Wallet/WalletConnectButton';
 import { useCreator } from '@/contexts/CreatorContext';
+import { useWallet } from '@/contexts/WalletContext';
 import { apiService } from '@/services/api';
 import { formatBCH, formatNumber } from '@/utils/formatters';
 import type { DashboardStats, Transaction } from '@/types/api';
@@ -25,6 +27,7 @@ type ChartPeriod = '7d' | '30d' | '90d';
 
 const DashboardPage = () => {
   const { creator, refreshCreator } = useCreator();
+  const { isConnected, balanceError } = useWallet();
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('30d');
 
   // Fetch dashboard stats with React Query
@@ -141,7 +144,31 @@ const DashboardPage = () => {
   }, [stats]);
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <DashboardSkeleton />;
+  }
+
+  // Friendly state when wallet isn't connected
+  if (error && !isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pt-24 pb-12 px-4 sm:px-6 flex items-center justify-center">
+        <div className="max-w-md w-full text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card rounded-2xl p-8 border-border/50"
+          >
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Wallet className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Connect your wallet</h2>
+            <p className="text-muted-foreground mb-6">
+              Connect your wallet to view your dashboard, balance, and payment activity.
+            </p>
+            <WalletConnectButton fullWidth size="lg" />
+          </motion.div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -150,12 +177,11 @@ const DashboardPage = () => {
         <div className="max-w-7xl mx-auto">
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {error instanceof Error ? error.message : 'Failed to load dashboard data'}
+            <AlertDescription className="flex flex-wrap items-center gap-3">
+              <span>{error instanceof Error ? error.message : 'Failed to load dashboard data'}</span>
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-4"
                 onClick={() => refetch()}
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -176,6 +202,13 @@ const DashboardPage = () => {
           <Breadcrumbs />
         </div>
 
+        {balanceError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{balanceError}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -183,7 +216,7 @@ const DashboardPage = () => {
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
         >
           <div>
-            <h1 className="text-4xl font-bold text-foreground mb-2">Dashboard</h1>
+            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground tracking-tight mb-2">Dashboard</h1>
             <p className="text-muted-foreground text-lg">
               Welcome back, <span className="text-primary font-medium">{creator?.displayName || 'Creator'}</span>!
             </p>
@@ -332,7 +365,7 @@ const DashboardPage = () => {
           >
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">Recent Transactions</h2>
+                <h2 className="font-heading text-xl font-semibold text-foreground mb-1">Recent Transactions</h2>
                 <p className="text-sm text-muted-foreground">Your latest payment activity</p>
               </div>
               <Link 

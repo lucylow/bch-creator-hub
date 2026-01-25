@@ -73,7 +73,8 @@ const QuickActions: React.FC<Props> = ({ creatorAddress }) => {
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/pay/${creator?.id || 'creator'}/default`;
+    // Single unified link: one URL for tips, subscriptions, and paywalls
+    const url = `${window.location.origin}/pay/${creator?.id || 'creator'}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Support me', url });

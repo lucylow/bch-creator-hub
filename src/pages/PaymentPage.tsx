@@ -1,28 +1,42 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, CheckCircle, Copy, ExternalLink, Globe, Calendar, Zap } from 'lucide-react';
+import { CheckCircle, Copy, ExternalLink, Globe, Calendar, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { formatBCH, truncateAddress, bchToSats } from '@/utils/formatters';
+import { formatBCH, truncateAddress } from '@/utils/formatters';
 import LoadingSpinner from '@/components/Common/LoadingSpinner';
 import PageTransition from '@/components/Common/PageTransition';
 import PaymentForm from '@/components/Payment/PaymentForm';
+import UnifiedPaymentInterface, { type UnifiedPaymentType } from '@/components/Payment/UnifiedPaymentInterface';
 import WalletConnectModal from '@/components/Wallet/WalletConnectModal';
 import { useWallet } from '@/contexts/WalletContext';
-import QRCodeDisplay from '@/components/Common/QRCodeDisplay';
+
+const CREATOR_INFO = {
+  displayName: 'Demo Creator',
+  bio: 'Building the future of creator monetization',
+  address: 'bitcoincash:qpaq9sh8w7xs5qn4q9c3l8f9k2d4q7s8vga9mpt2vh',
+  contractAddress: 'bitcoincash:qpaq9sh8w7xs5qn4q9c3l8f9k2d4q7s8vga9mpt2vh',
+};
+
+function paymentTypeFromSlug(slug: string | undefined): UnifiedPaymentType {
+  if (slug === 'subscription' || slug === 'sub') return 'subscription';
+  if (slug === 'paywall' || slug === 'unlock') return 'paywall';
+  return 'tip';
+}
 
 const PaymentPage = () => {
   const { creatorId, paymentId } = useParams<{ creatorId?: string; paymentId?: string }>();
   const navigate = useNavigate();
   const { isConnected, address, sendPayment } = useWallet();
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [amount, setAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [txHash, setTxHash] = useState('');
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [paymentType, setPaymentType] = useState<UnifiedPaymentType>(() => paymentTypeFromSlug(paymentId));
   const [paymentDetails, setPaymentDetails] = useState({
     recipient: '',
     amountSats: 0,
@@ -31,20 +45,19 @@ const PaymentPage = () => {
     createdAt: new Date().toISOString(),
   });
 
-  const creatorInfo = {
-    displayName: 'Demo Creator',
-    bio: 'Building the future of creator monetization',
-    address: 'bitcoincash:qpaq9sh8w7xs5qn4q9c3l8f9k2d4q7s8vga9mpt2vh',
-    contractAddress: 'bitcoincash:qpaq9sh8w7xs5qn4q9c3l8f9k2d4q7s8vga9mpt2vh',
-  };
+  const creatorInfo = CREATOR_INFO;
+
+  const unifiedPaymentLink = useMemo(
+    () => (creatorId ? `${window.location.origin}/pay/${creatorId}` : undefined),
+    [creatorId]
+  );
 
   const loadDetails = useCallback(async () => {
     setIsLoading(true);
-    // Mock loading - replace with actual API call
     setTimeout(() => {
       setPaymentDetails({
         recipient: creatorInfo.address,
-        amountSats: 0, // 0 means flexible amount
+        amountSats: 0,
         description: paymentId ? `Payment ${paymentId}` : 'Support this creator',
         contentUrl: '',
         createdAt: new Date().toISOString(),
@@ -54,10 +67,12 @@ const PaymentPage = () => {
   }, [paymentId]);
 
   useEffect(() => {
-    if (creatorId) {
-      loadDetails();
-    }
+    if (creatorId) loadDetails();
   }, [creatorId, loadDetails]);
+
+  useEffect(() => {
+    setPaymentType(paymentTypeFromSlug(paymentId));
+  }, [paymentId]);
 
   const handlePayment = async () => {
     if (!isConnected) {
@@ -67,16 +82,15 @@ const PaymentPage = () => {
 
     try {
       setIsProcessing(true);
-      
       const amountSats = paymentDetails.amountSats || Math.round(parseFloat(amount) * 100000000);
-      
+
       const result = await sendPayment(
         creatorInfo.contractAddress,
         amountSats,
         JSON.stringify({
           creatorId,
-          paymentType: 'tip',
-          metadata: {}
+          paymentType,
+          metadata: {},
         })
       );
 
@@ -95,10 +109,11 @@ const PaymentPage = () => {
     }
   };
 
-  const copyAddress = () => {
-    navigator.clipboard.writeText(creatorInfo.address);
-    toast.success('Address copied!');
-  };
+  const amountSatsForQR = useMemo(() => {
+    const n = parseFloat(amount);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    return Math.round(n * 100000000);
+  }, [amount]);
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -187,19 +202,6 @@ const PaymentPage = () => {
             </div>
 
             <div className="space-y-4 mb-6">
-              <div className="flex justify-between items-center p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Creator</p>
-                    <p className="font-medium text-foreground">{creatorInfo.displayName}</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" onClick={copyAddress}>
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-
               <div className="p-4 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-3 mb-2">
                   <Zap className="w-5 h-5 text-primary" />
@@ -234,21 +236,16 @@ const PaymentPage = () => {
               </div>
             </div>
 
-            {/* QR Code */}
-            <div className="flex flex-col items-center p-6 rounded-xl bg-muted/50">
-              <QRCodeDisplay
-                value={creatorInfo.address.includes('bitcoincash:') 
-                  ? `${creatorInfo.address}${amount ? `?amount=${amount}` : ''}`
-                  : `bitcoincash:${creatorInfo.address}${amount ? `?amount=${amount}` : ''}`}
-                title="Scan to Pay"
-                description="Use any BCH wallet to scan this code"
-                size={200}
-                level="H"
-                showDownload={true}
-                showCopy={true}
-                showShare={false}
-              />
-            </div>
+            {/* Unified: one QR + address for tips, subscriptions, paywalls */}
+            <UnifiedPaymentInterface
+              address={creatorInfo.address}
+              creatorName={creatorInfo.displayName}
+              amountSats={amountSatsForQR}
+              paymentType={paymentType}
+              onPaymentTypeChange={setPaymentType}
+              paymentLinkUrl={unifiedPaymentLink}
+              qrSize={200}
+            />
           </div>
 
           {/* Payment Form */}

@@ -4,6 +4,7 @@ const BCHService = require('./bch.service');
 const MicropaymentService = require('./micropayment.service');
 const NotificationService = require('./notification.service');
 const WebhookService = require('./webhook.service');
+const balanceCache = require('./balanceCache.service');
 const logger = require('../utils/logger');
 const { AppError, ValidationError } = require('../utils/errors');
 const { TRANSACTION_STATUS, MIN_CONFIRMATIONS } = require('../config/constants');
@@ -179,9 +180,7 @@ class PaymentService {
         }
       });
 
-      // Update creator balance cache
-      const redis = require('../config/redis');
-      await redis.del(`creator:${creatorId}:balance`);
+      await balanceCache.invalidateBalance(creatorId);
 
       // Send notifications
       if (txVerification.isConfirmed) {
@@ -345,10 +344,7 @@ class PaymentService {
             const updatedTx = await Transaction.findByTxid(txid);
             await NotificationService.notifyPaymentConfirmed(pending.creatorId, updatedTx);
             await WebhookService.triggerPaymentWebhooks(pending.creatorId, updatedTx);
-            
-            // Update creator balance cache
-            const redis = require('../config/redis');
-            await redis.del(`creator:${pending.creatorId}:balance`);
+            await balanceCache.invalidateBalance(pending.creatorId);
           }
         }
 

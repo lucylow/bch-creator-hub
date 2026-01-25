@@ -123,7 +123,7 @@ const HelpPage = () => {
               </Button>
             </Link>
           </div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">Help & Documentation</h1>
+          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground tracking-tight mb-2">Help & Documentation</h1>
           <p className="text-muted-foreground text-lg">
             Find answers to common questions and learn how to use BCH Creator Hub
           </p>

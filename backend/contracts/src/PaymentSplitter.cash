@@ -59,8 +59,8 @@ contract PaymentSplitter {
      * @param data OP_RETURN data (ignored)
      */
     function distribute(bytes data) {
-        // Anyone can trigger distribution
-        int totalAmount = tx.value;
+        // Anyone can trigger distribution; use active contract input value
+        int totalAmount = tx.inputs[this.activeInputIndex].value;
         require(totalAmount >= DUST_LIMIT, "Amount below dust limit");
         
         // Calculate and verify outputs
@@ -71,11 +71,9 @@ contract PaymentSplitter {
             Recipient memory recipient = recipients[i];
             int shareAmount = totalAmount * recipient.share / SHARE_DENOMINATOR;
             
-            // Apply minimum payment threshold
+            // Below minPayment: skip this recipient (hold in contract for later)
             if (shareAmount < recipient.minPayment) {
-                // Hold until threshold met (accumulate in contract)
-                // For now, still distribute minimum
-                shareAmount = recipient.minPayment;
+                shareAmount = 0;
             }
             
             if (shareAmount > 0) {
@@ -236,7 +234,7 @@ contract PaymentSplitter {
      * @return info Encoded contract parameters
      */
     function getInfo() returns (bytes) {
-        bytes memory data = new bytes(2 + (recipients.length * 26));
+        bytes memory data = new bytes(3 + (recipients.length * 26));
         
         // Number of recipients (1 byte)
         data[0] = byte(recipients.length);
@@ -258,10 +256,11 @@ contract PaymentSplitter {
             data[offset + 20] = byte(recipients[i].share >> 8);
             data[offset + 21] = byte(recipients[i].share & 0xFF);
             
-            // Min payment (4 bytes, big-endian)
+            // Min payment (4 bytes, big-endian) — use local copy to avoid mutating state
+            int minPay = recipients[i].minPayment;
             for (int j = 3; j >= 0; j--) {
-                data[offset + 22 + j] = byte(recipients[i].minPayment & 0xFF);
-                recipients[i].minPayment = recipients[i].minPayment >> 8;
+                data[offset + 22 + j] = byte(minPay & 0xFF);
+                minPay = minPay >> 8;
             }
         }
         

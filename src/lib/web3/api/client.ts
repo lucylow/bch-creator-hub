@@ -5,6 +5,7 @@
 
 import { apiService } from '@/services/api';
 import type { ApiResponse } from '@/types/api';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
 
 // Legacy API Client wrapper - redirects to unified service
 class ApiClient {
@@ -31,20 +32,21 @@ class ApiClient {
         throw new Error('Authentication expired');
       }
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') ?? '';
+      const data = contentType.includes('application/json')
+        ? await response.json().catch(() => ({ success: false, error: `HTTP ${response.status}: ${response.statusText}` }))
+        : { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
       
-      if (data.token) {
+      if (data?.token) {
         localStorage.setItem('auth_token', data.token);
-      } else if (data.data?.token) {
+      } else if (data?.data?.token) {
         localStorage.setItem('auth_token', data.data.token);
       }
 
       return data as ApiResponse<T>;
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'API request failed',
-      };
+      const msg = getUserFriendlyMessage(error, 'API request failed');
+      return { success: false, error: msg };
     }
   }
 
@@ -78,20 +80,20 @@ class ApiClient {
         throw new Error('Authentication expired');
       }
 
-      const responseData = await response.json();
+      const contentType = response.headers.get('content-type') ?? '';
+      const responseData = contentType.includes('application/json')
+        ? await response.json().catch(() => ({ success: false, error: `HTTP ${response.status}: ${response.statusText}` }))
+        : { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
       
-      if (responseData.token) {
+      if (responseData?.token) {
         localStorage.setItem('auth_token', responseData.token);
-      } else if (responseData.data?.token) {
+      } else if (responseData?.data?.token) {
         localStorage.setItem('auth_token', responseData.data.token);
       }
 
       return responseData as ApiResponse<T>;
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'API request failed',
-      };
+      return { success: false, error: getUserFriendlyMessage(error, 'API request failed') };
     }
   }
 
@@ -153,13 +155,13 @@ class ApiClient {
         throw new Error('Authentication expired');
       }
 
-      const responseData = await response.json();
+      const contentType = response.headers.get('content-type') ?? '';
+      const responseData = contentType.includes('application/json')
+        ? await response.json().catch(() => ({ success: false, error: `HTTP ${response.status}: ${response.statusText}` }))
+        : { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
       return responseData as ApiResponse<T>;
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'API request failed',
-      };
+      return { success: false, error: getUserFriendlyMessage(error, 'API request failed') };
     }
   }
 }

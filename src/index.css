@@ -114,27 +114,46 @@
 }
 
 @layer base {
+  :root {
+    --font-sans: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Space Grotesk', 'Outfit', sans-serif;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
   }
 
   /* Monospaced for numbers/wallet */
   .font-mono {
-    font-family: 'Roboto Mono', 'SF Mono', 'Monaco', monospace;
+    font-family: 'JetBrains Mono', 'Roboto Mono', 'SF Mono', 'Monaco', monospace;
   }
 }
 
 @layer utilities {
+  .font-heading {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+
   .text-gradient {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .section-title {
+    @apply text-3xl sm:text-4xl font-bold tracking-tight;
   }
 
   .bg-gradient-primary {

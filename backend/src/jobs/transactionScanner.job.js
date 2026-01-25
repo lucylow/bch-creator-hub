@@ -5,6 +5,7 @@ const Creator = require('../models/Creator');
 const Transaction = require('../models/Transaction');
 const NotificationService = require('../services/notification.service');
 const CashTokenService = require('../services/cashtoken.service');
+const balanceCache = require('../services/balanceCache.service');
 const logger = require('../utils/logger');
 const { ExternalServiceError, DatabaseError, AppError, ValidationError } = require('../utils/errors');
 
@@ -414,18 +415,7 @@ class TransactionScanner {
 
   async updateCreatorBalance(creatorId) {
     try {
-      const balance = await Creator.getBalance(creatorId);
-      
-      // Update Redis cache
-      const redis = require('../config/redis');
-      await redis.set(
-        `creator:${creatorId}:balance`,
-        JSON.stringify(balance),
-        'EX',
-        300 // 5 minutes cache
-      );
-      
-      // Send WebSocket update
+      const balance = await balanceCache.refreshBalance(creatorId);
       const wsServer = require('../websocket/server');
       wsServer.broadcastToCreator(creatorId, 'balance:update', balance);
     } catch (error) {
