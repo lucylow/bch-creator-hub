@@ -19,10 +19,13 @@ import type {
   TopSupporter,
   Webhook,
 } from '@/types/api';
+import { isDemoMode } from '@/config/demo';
+import { generateMockDashboardStats, generateMockTransactions, generateMockPaymentIntents } from '@/demo/mockData';
 
 /**
  * Unified API Service
  * Consolidates all backend API calls with proper TypeScript types
+ * In demo mode, returns mock data instead of calling the real API
  */
 class ApiService {
   private readonly baseURL: string;
@@ -176,6 +179,13 @@ class ApiService {
    * Get dashboard stats
    */
   async getDashboardStats(period: '7d' | '30d' | '90d' = '30d'): Promise<ApiResponse<DashboardStats>> {
+    // In demo mode, return mock data
+    if (isDemoMode()) {
+      return {
+        success: true,
+        data: generateMockDashboardStats(period),
+      };
+    }
     return this.request<DashboardStats>(`/api/creators/dashboard?period=${period}`);
   }
 
