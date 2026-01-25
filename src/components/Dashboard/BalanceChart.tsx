@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatBCH } from '@/utils/formatters';
 
@@ -6,10 +6,11 @@ type DataPoint = { label: string; value: number };
 
 type Props = { data?: DataPoint[]; type?: 'line' | 'area' };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+// Using forwardRef to avoid React warning with Recharts Tooltip
+const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload, label }, ref) => {
   if (active && payload && payload.length) {
     return (
-      <div className="glass-card rounded-lg p-3 border border-border shadow-lg">
+      <div ref={ref} className="glass-card rounded-lg p-3 border border-border shadow-lg">
         <p className="text-sm font-medium text-foreground mb-1">{label}</p>
         <p className="text-lg font-bold text-primary">
           {formatBCH((payload[0].value || 0) * 1e8)}
@@ -18,7 +19,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     );
   }
   return null;
-};
+});
+CustomTooltip.displayName = 'CustomTooltip';
 
 const BalanceChart: React.FC<Props> = ({ data = [], type = 'area' }) => {
   const chartData = data.map(d => ({
