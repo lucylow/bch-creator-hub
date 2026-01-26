@@ -6,6 +6,7 @@ import { Loader2, Image as ImageIcon } from 'lucide-react';
 import { NFT_ADDRESS } from '@/lib/web3/providers/EVMProvider';
 import { getNFTsForAddress } from '@/demo/mockNFTs';
 import { logger } from '@/utils/logger';
+import NFTDetailDialog from './NFTDetailDialog';
 
 // NFT Collection ABI
 const NFT_ABI = [

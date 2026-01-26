@@ -191,7 +191,8 @@ class WalletService {
         const device = await win.electronCash.requestDevice();
         await device.open();
         const ecAccounts = await device.getAccounts();
-        address = ecAccounts[0]?.address || ecAccounts[0];
+        const firstAccount = ecAccounts[0];
+        address = typeof firstAccount === 'string' ? firstAccount : (firstAccount?.address || '');
         break;
       }
 
@@ -222,14 +223,23 @@ class WalletService {
     let signature: string;
 
     const wallet = win.paytaca || win.bitcoinCash || win.electronCash;
+    const walletInstance = wallet as {
+      getAccounts?: () => Promise<string[]>;
+      signMessage?: (address: string, message: string, format?: string) => Promise<string>;
+      sendTransaction?: (tx: unknown) => Promise<string>;
+      request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (event: string, handler: (data: unknown) => void) => void;
+      isConnected?: () => boolean;
+    } | undefined;
+    
     if (walletType === 'paytaca' || walletType === 'generic') {
       try {
-        signature = await this.signMessageBIP322(address, message, wallet);
+        signature = await this.signMessageBIP322(address, message, walletInstance);
       } catch {
-        signature = await this.signMessageLegacy(address, message, wallet);
+        signature = await this.signMessageLegacy(address, message, walletInstance);
       }
     } else {
-      signature = await this.signMessageLegacy(address, message, wallet);
+      signature = await this.signMessageLegacy(address, message, walletInstance);
     }
 
     return {
@@ -240,10 +250,12 @@ class WalletService {
     };
   }
 
-  private async signMessageBIP322(address: string, message: string, wallet: Window['paytaca'] | Window['bitcoinCash']): Promise<string> {
+  private async signMessageBIP322(address: string, message: string, wallet?: { signMessage?: (a: string, b: string, c?: string) => Promise<string>; request?: (args: { method: string; params?: unknown[] }) => Promise<unknown> }): Promise<string> {
     try {
+      if (!wallet) throw new Error('No wallet provided');
+      
       // Try BIP-322 signing (preferred method)
-      if (wallet.signMessage && wallet.signMessage.length === 3) {
+      if (wallet.signMessage) {
         return await wallet.signMessage(address, message, 'bip322');
       }
       
@@ -252,7 +264,7 @@ class WalletService {
           method: 'bch_signMessage',
           params: [address, message, 'bip322']
         });
-        return signature;
+        return String(signature);
       }
       
       throw new Error('BIP-322 signing not supported');
@@ -261,17 +273,13 @@ class WalletService {
     }
   }
 
-  private async signMessageLegacy(address: string, message: string, wallet: Window['paytaca'] | Window['bitcoinCash'] | Window['electronCash']): Promise<string> {
+  private async signMessageLegacy(address: string, message: string, wallet?: { signMessage?: (a: string, b: string, c?: string) => Promise<string>; request?: (args: { method: string; params?: unknown[] }) => Promise<unknown> }): Promise<string> {
     try {
+      if (!wallet) throw new Error('No wallet provided');
+      
       // Legacy signing methods
       if (wallet.signMessage) {
-        if (typeof wallet.signMessage === 'function') {
-          if (wallet.signMessage.length === 3) {
-            return await wallet.signMessage(address, message, 'legacy');
-          } else {
-            return await wallet.signMessage(message);
-          }
-        }
+        return await wallet.signMessage(address, message, 'legacy');
       }
       
       if (wallet.request) {
@@ -279,7 +287,7 @@ class WalletService {
           method: 'bch_signMessage',
           params: [address, message]
         });
-        return signature;
+        return String(signature);
       }
       
       // Generate a demo signature for development

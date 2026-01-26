@@ -118,7 +118,7 @@ class ApiService {
         if (t != null) localStorage.setItem('auth_token', String(t));
       }
 
-      return data as ApiResponse<T>;
+      return { success: true, ...data } as ApiResponse<T>;
     } catch (error) {
       clearTimeout(timeoutId);
       const normalized = normalizeError(error);

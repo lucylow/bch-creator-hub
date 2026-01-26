@@ -207,6 +207,8 @@ export interface Withdrawal {
   amount?: number;
   amountSats?: number;
   fee?: number;
+  feeSats?: number;
+  toAddress?: string;
   status: string;
   txid?: string;
   createdAt: string;

@@ -45,8 +45,14 @@ type BackendCreatorShape = {
   feeBasisPoints?: number;
   is_verified?: boolean;
   isVerified?: boolean;
-  balance?: number;
-  stats?: unknown;
+  balance?: number | { confirmed: number; unconfirmed: number; total: number };
+  stats?: {
+    totalEarnings?: number;
+    totalTransactions?: number;
+    activeSupporters?: number;
+    monthlyEarnings?: number;
+    todayEarnings?: number;
+  };
   created_at?: string;
   createdAt?: string;
   last_login?: string;
@@ -56,6 +62,24 @@ type BackendCreatorShape = {
 // Helper to transform backend creator object (snake_case) to frontend format (camelCase)
 const transformCreator = (backendCreator: BackendCreatorShape | null): Creator | null => {
   if (!backendCreator) return null;
+  
+  // Transform balance - could be number or object
+  let balance: { confirmed: number; unconfirmed: number; total: number } | undefined;
+  if (typeof backendCreator.balance === 'number') {
+    balance = { confirmed: backendCreator.balance, unconfirmed: 0, total: backendCreator.balance };
+  } else if (backendCreator.balance) {
+    balance = backendCreator.balance;
+  }
+  
+  // Transform stats
+  const stats = backendCreator.stats ? {
+    totalEarnings: backendCreator.stats.totalEarnings ?? 0,
+    totalTransactions: backendCreator.stats.totalTransactions ?? 0,
+    activeSupporters: backendCreator.stats.activeSupporters ?? 0,
+    monthlyEarnings: backendCreator.stats.monthlyEarnings ?? 0,
+    todayEarnings: backendCreator.stats.todayEarnings ?? 0,
+  } : undefined;
+  
   return {
     id: backendCreator.creator_id || backendCreator.id || '',
     creatorId: backendCreator.creator_id || backendCreator.creatorId || '',
@@ -69,8 +93,8 @@ const transformCreator = (backendCreator: BackendCreatorShape | null): Creator |
     contractAddress: backendCreator.contract_address || backendCreator.contractAddress,
     feeBasisPoints: backendCreator.fee_basis_points ?? backendCreator.feeBasisPoints ?? 100,
     isVerified: backendCreator.is_verified ?? backendCreator.isVerified ?? false,
-    balance: backendCreator.balance,
-    stats: backendCreator.stats,
+    balance,
+    stats,
     createdAt: backendCreator.created_at || backendCreator.createdAt || new Date().toISOString(),
     lastLogin: backendCreator.last_login || backendCreator.lastLogin,
   };
@@ -92,7 +116,7 @@ export const CreatorProvider = ({ children }: { children: ReactNode }) => {
       const response = await apiService.getCreatorProfile();
       
       if (response.success && response.data) {
-        const transformedCreator = transformCreator(response.data);
+        const transformedCreator = transformCreator(response.data as BackendCreatorShape);
         setCreator(transformedCreator);
       } else {
         logger.error('Failed to load creator profile', new Error(response.error || 'Unknown error'));
@@ -131,7 +155,7 @@ export const CreatorProvider = ({ children }: { children: ReactNode }) => {
       const response = await apiService.updateCreatorProfile(updateData);
       
       if (response.success && response.data) {
-        const transformedCreator = transformCreator(response.data);
+        const transformedCreator = transformCreator(response.data as BackendCreatorShape);
         setCreator(transformedCreator);
         toast.success('Profile updated successfully');
       } else {

@@ -102,10 +102,10 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       
       switch (paymentType) {
         case 'content_unlock':
-          result = await unlockContent(metadata.paymentIntentId || '', amountSatoshis);
+          result = await unlockContent(String(metadata.paymentIntentId || ''), amountSatoshis);
           break;
         case 'subscription':
-          result = await purchaseSubscription(recipientAddress, amountSatoshis, metadata.periods || 1);
+          result = await purchaseSubscription(recipientAddress, amountSatoshis, Number(metadata.periods) || 1);
           break;
         default:
           result = await sendTip(recipientAddress, amountSatoshis, {
@@ -166,7 +166,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
         </div>
         <h2 className="text-2xl font-bold mb-2">{getPaymentTitle()}</h2>
         {metadata.recipientName && (
-          <p className="text-muted-foreground">To: {metadata.recipientName}</p>
+          <p className="text-muted-foreground">To: {String(metadata.recipientName)}</p>
         )}
       </div>
 
@@ -384,7 +384,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       <QRCodeModal
         open={showQR}
         onOpenChange={setShowQR}
-        value={generatePaymentURI(recipientAddress, amountSats, metadata.recipientName || '', memo)}
+        value={generatePaymentURI(recipientAddress, amountSats, String(metadata.recipientName || ''), memo)}
         title="Scan to Pay"
         description={`Pay ${formatBCH(amountSats)} to ${truncateAddress(recipientAddress)}`}
         size={256}

@@ -77,7 +77,7 @@ export class BCHProvider {
     
     if (typeof window === 'undefined') return wallets;
 
-    const win = window as Window & { paytaca?: unknown; electronCash?: unknown; [key: string]: unknown };
+    const win = window as unknown as Window & { paytaca?: unknown; electronCash?: unknown; bitcoinCash?: unknown; libauth?: unknown; walletConnectProvider?: unknown; [key: string]: unknown };
     
     // Check for Paytaca wallet (most popular BCH wallet)
     if (win.paytaca) {
@@ -259,7 +259,7 @@ export class BCHProvider {
   private async connectLibauth(libauth: { requestAccounts?: () => Promise<unknown> }): Promise<string[]> {
     try {
       if (typeof libauth.requestAccounts === 'function') {
-        const accounts = await lib.requestAccounts();
+        const accounts = await libauth.requestAccounts();
         return Array.isArray(accounts) ? accounts as string[] : [accounts] as string[];
       }
       
@@ -275,8 +275,9 @@ export class BCHProvider {
       // Listen for account changes from wallet
       if (typeof w?.on === 'function') {
         w.on('accountsChanged', (accounts: unknown) => {
-          if (accounts && accounts.length > 0 && this.currentWallet) {
-            const newAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+          const accountsArray = accounts as unknown[];
+          if (accountsArray && accountsArray.length > 0 && this.currentWallet) {
+            const newAddress = Array.isArray(accountsArray) ? String(accountsArray[0]) : String(accountsArray);
             if (newAddress !== this.currentWallet.address) {
               this.handleAccountChange(newAddress);
             }
@@ -285,8 +286,8 @@ export class BCHProvider {
       }
       
       // Also listen for disconnect events
-      if (typeof walletInstance.on === 'function') {
-        walletInstance.on('disconnect', () => {
+      if (typeof w?.on === 'function') {
+        w.on('disconnect', () => {
           this.handleDisconnect();
         });
       }
@@ -340,13 +341,13 @@ export class BCHProvider {
         const accounts = await wallet.request({
           method: 'bch_requestAccounts'
         });
-        return Array.isArray(accounts) ? accounts : [accounts];
+        return Array.isArray(accounts) ? accounts.map(String) : [String(accounts)];
       }
       
       // Fallback to legacy method
       if (wallet.enable) {
         const accounts = await wallet.enable();
-        return Array.isArray(accounts) ? accounts : [accounts];
+        return Array.isArray(accounts) ? accounts.map(String) : [String(accounts)];
       }
       
       throw new Error('Wallet does not support connection');
@@ -370,10 +371,10 @@ export class BCHProvider {
       }
       
       // Method 2: EIP-1193 style request
-      if (typeof paytaca.request === 'function') {
+      if (typeof p?.request === 'function') {
         try {
-          const result = await paytaca.request({ method: 'bch_requestAccounts' });
-          accounts = Array.isArray(result) ? result : [result];
+          const result = await p.request({ method: 'bch_requestAccounts' });
+          accounts = Array.isArray(result) ? (result as string[]) : [result as string];
           if (accounts.length > 0) return accounts;
         } catch (e) {
           console.debug('Paytaca request method failed, trying enable');
@@ -608,7 +609,11 @@ export class BCHProvider {
 
   async sendTransaction(toAddress: string, amountSatoshis: number, options: Record<string, unknown> = {}): Promise<{ success: boolean; txid?: string; amount: number }> {
     try {
-      const wallet = this.currentWallet?.wallet;
+      const walletData = this.currentWallet;
+      const wallet = walletData?.wallet as { 
+        request?: (args: { method: string; params?: unknown[] }) => Promise<string>;
+        sendTransaction?: (tx: unknown) => Promise<string>;
+      } | null;
       
       if (!wallet) {
         throw new Error('No wallet connected');
@@ -623,13 +628,13 @@ export class BCHProvider {
       // Send transaction
       let txHash: string;
       
-      if (wallet.request) {
+      if (typeof wallet.request === 'function') {
         const result = await wallet.request({
           method: 'bch_sendTransaction',
           params: [txParams]
         });
         txHash = result;
-      } else if (wallet.sendTransaction) {
+      } else if (typeof wallet.sendTransaction === 'function') {
         txHash = await wallet.sendTransaction(txParams);
       } else {
         throw new Error('Wallet does not support sending transactions');
@@ -709,10 +714,11 @@ export class BCHProvider {
     this.contracts = {};
     
     if (typeof window !== 'undefined') {
-      if (walletRef?.wallet && typeof walletRef.wallet.removeListener === 'function') {
+      const wallet = walletRef?.wallet as { removeListener?: (event: string, handler: () => void) => void } | null;
+      if (wallet && typeof wallet.removeListener === 'function') {
         try {
-          walletRef.wallet.removeListener('accountsChanged', () => {});
-          walletRef.wallet.removeListener('disconnect', () => {});
+          wallet.removeListener('accountsChanged', () => {});
+          wallet.removeListener('disconnect', () => {});
         } catch {
           // Ignore cleanup errors
         }

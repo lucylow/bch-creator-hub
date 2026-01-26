@@ -64,15 +64,15 @@ const DashboardPage = () => {
 
     // Handle backend response format (balance, stats objects)
     if ('balance' in dashboardData && 'stats' in dashboardData) {
-      const balance = dashboardData.balance as Record<string, unknown> | undefined;
-      const stats = dashboardData.stats as Record<string, unknown> | undefined;
+      const balance = dashboardData.balance as Record<string, number> | undefined;
+      const stats = dashboardData.stats as Record<string, number> | undefined;
       return {
-        totalBalance: balance?.total_balance || balance?.total || 0,
-        todayEarnings: parseInt(stats?.today_earnings || stats?.todayEarnings || 0),
-        monthlyEarnings: parseInt(stats?.monthly_earnings || stats?.monthlyEarnings || 0),
-        transactionCount: parseInt(stats?.transaction_count || stats?.transactionCount || 0),
-        avgTransaction: parseInt(stats?.avg_transaction || stats?.avgTransaction || 0),
-        activeSupporters: parseInt(stats?.unique_supporters || stats?.activeSupporters || 0),
+        totalBalance: Number(balance?.total_balance || balance?.total || 0),
+        todayEarnings: Number(stats?.today_earnings || stats?.todayEarnings || 0),
+        monthlyEarnings: Number(stats?.monthly_earnings || stats?.monthlyEarnings || 0),
+        transactionCount: Number(stats?.transaction_count || stats?.transactionCount || 0),
+        avgTransaction: Number(stats?.avg_transaction || stats?.avgTransaction || 0),
+        activeSupporters: Number(stats?.unique_supporters || stats?.activeSupporters || 0),
       };
     }
 
@@ -95,7 +95,7 @@ const DashboardPage = () => {
     if ('chartData' in dashboardData && Array.isArray(dashboardData.chartData)) {
       return dashboardData.chartData.map((item: { date?: string; amount?: number; value?: number }, index: number) => ({
         label: item.date ? new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }) : `Day ${index + 1}`,
-        value: parseInt(item.amount || item.value || 0),
+        value: Number(item.amount || item.value || 0),
       }));
     }
 
@@ -103,7 +103,7 @@ const DashboardPage = () => {
     if ('earningsChart' in dashboardData && Array.isArray(dashboardData.earningsChart)) {
       return dashboardData.earningsChart.map((item: { date: string; amount?: number }, index: number) => ({
         label: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }) || `Day ${index + 1}`,
-        value: parseInt(item.amount || 0),
+        value: Number(item.amount || 0),
       }));
     }
 
@@ -114,22 +114,23 @@ const DashboardPage = () => {
   const transactions: Transaction[] = useMemo(() => {
     if (!dashboardData) return [];
     
-    const txList = ('recentTransactions' in dashboardData 
+    type TxRecord = Record<string, unknown>;
+    const rawList = ('recentTransactions' in dashboardData 
       ? dashboardData.recentTransactions 
-      : (dashboardData as { recentTransactions?: unknown[] }).recentTransactions) || [];
+      : (dashboardData as { recentTransactions?: TxRecord[] }).recentTransactions) || [];
     
-    return txList.map((tx: Record<string, unknown>) => ({
-      id: tx.id || tx.txid,
-      txid: tx.txid,
-      creatorId: tx.creator_id || tx.creatorId || creator?.id || '',
-      senderAddress: tx.sender_address || tx.senderAddress || '',
-      recipientAddress: tx.recipient_address || tx.recipientAddress || creator?.address || '',
-      amountSats: parseInt(tx.amount_sats || tx.amountSats || 0),
-      feeSats: parseInt(tx.fee_sats || tx.feeSats || 0),
+    return (rawList as TxRecord[]).map((tx) => ({
+      id: String(tx.id || tx.txid || ''),
+      txid: String(tx.txid || ''),
+      creatorId: String(tx.creator_id || tx.creatorId || creator?.id || ''),
+      senderAddress: String(tx.sender_address || tx.senderAddress || ''),
+      recipientAddress: String(tx.recipient_address || tx.recipientAddress || creator?.address || ''),
+      amountSats: Number(tx.amount_sats || tx.amountSats || 0),
+      feeSats: Number(tx.fee_sats || tx.feeSats || 0),
       status: (tx.status || 'confirmed') as 'pending' | 'confirmed' | 'failed',
-      confirmations: tx.confirmations || 0,
-      createdAt: tx.created_at || tx.createdAt || new Date().toISOString(),
-      paymentType: tx.payment_type || tx.paymentType,
+      confirmations: Number(tx.confirmations || 0),
+      createdAt: String(tx.created_at || tx.createdAt || new Date().toISOString()),
+      paymentType: String(tx.payment_type || tx.paymentType || ''),
     }));
   }, [dashboardData, creator]);
 

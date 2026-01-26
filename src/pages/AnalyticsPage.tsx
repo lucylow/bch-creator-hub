@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   TrendingUp,
   TrendingDown,
@@ -81,8 +81,19 @@ const AnalyticsPage = () => {
     }));
   }, [earningsChart]);
 
+  interface TxRecord {
+    paymentType?: string;
+    payment_type?: string;
+    amountSats?: number;
+    amount_sats?: number;
+    senderAddress?: string;
+    sender_address?: string;
+    createdAt?: string;
+    created_at?: string;
+  }
+
   const topSources = useMemo(() => {
-    const txList = (dashboardStats as { recentTransactions?: unknown[] } | null)?.recentTransactions ?? [];
+    const txList = (dashboardStats as { recentTransactions?: TxRecord[] } | null)?.recentTransactions ?? [];
     if (!Array.isArray(txList) || txList.length === 0) return [];
     const byType: Record<string, { amount: number; count: number }> = {};
     for (const tx of txList) {
@@ -103,7 +114,7 @@ const AnalyticsPage = () => {
   }, [dashboardStats]);
 
   const topSupporters = useMemo(() => {
-    const txList = (dashboardStats as { recentTransactions?: unknown[] } | null)?.recentTransactions ?? [];
+    const txList = (dashboardStats as { recentTransactions?: TxRecord[] } | null)?.recentTransactions ?? [];
     if (!Array.isArray(txList)) return [];
     const byAddr: Record<string, { totalAmount: number; count: number; lastAt: string }> = {};
     for (const tx of txList) {
