@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom';
 import { Route, Twitter, Github } from 'lucide-react';
+import { ThemeToggle } from '@/components/Common/ThemeToggle';
 
 const footerLinks = {
   product: [
