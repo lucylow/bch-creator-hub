@@ -69,6 +69,10 @@ export function LiveTransactionsProvider({ children, creatorId }: LiveTransactio
     return liveSocket.on('payment:received', cb);
   }, []);
 
+  const onPaymentsBatch = useCallback((cb: (payload: PaymentsBatchPayload) => void) => {
+    return liveSocket.on('payments:batch', cb);
+  }, []);
+
   const onPaymentConfirmed = useCallback((cb: (payload: PaymentConfirmedPayload) => void) => {
     return liveSocket.on('payment:confirmed', cb);
   }, []);
@@ -90,7 +94,7 @@ export function LiveTransactionsProvider({ children, creatorId }: LiveTransactio
       onBalanceUpdate,
       onWithdrawalStatus,
     }),
-    [isConnected, onPaymentReceived, onPaymentConfirmed, onBalanceUpdate, onWithdrawalStatus]
+    [isConnected, onPaymentReceived, onPaymentsBatch, onPaymentConfirmed, onBalanceUpdate, onWithdrawalStatus]
   );
 
   return (
