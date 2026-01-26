@@ -18,6 +18,8 @@ const routeLabels: Record<string, string> = {
   '/links': 'Payment Links',
   '/links/new': 'Create Link',
   '/nfts': 'NFTs',
+  '/dao': 'Governance',
+  '/dao/propose': 'Create Proposal',
   '/analytics': 'Analytics',
   '/settings': 'Settings',
 };

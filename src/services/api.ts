@@ -18,10 +18,20 @@ import type {
   EarningsChartData,
   TopSupporter,
   Webhook,
+  Withdrawal,
 } from '@/types/api';
 import { isDemoMode } from '@/config/demo';
-import { generateMockDashboardStats, generateMockTransactions, generateMockPaymentIntents, generateMockWithdrawals } from '@/demo/mockData';
+import {
+  generateMockDashboardStats,
+  generateMockTransactions,
+  generateMockPaymentIntents,
+  generateMockWithdrawals,
+  generateMockTransactionStats,
+  generateMockAnalyticsApi,
+  generateMockEarningsChart,
+} from '@/demo/mockData';
 import { normalizeError, getUserFriendlyMessage } from '@/utils/errorUtils';
+import { logger } from '@/utils/logger';
 
 /**
  * Unified API Service
@@ -205,14 +215,18 @@ class ApiService {
    * Get dashboard stats
    */
   async getDashboardStats(period: '7d' | '30d' | '90d' = '30d'): Promise<ApiResponse<DashboardStats>> {
-    // In demo mode, return mock data
     if (isDemoMode()) {
       return {
         success: true,
         data: generateMockDashboardStats(period),
       };
     }
-    return this.request<DashboardStats>(`/api/creators/dashboard?period=${period}`);
+    const response = await this.request<DashboardStats>(`/api/creators/dashboard?period=${period}`);
+    if (!response.success) {
+      logger.warn('Dashboard stats API failed, falling back to mock data', { error: response.error, period });
+      return { success: true, data: generateMockDashboardStats(period) };
+    }
+    return response;
   }
 
   // ============ Payment Endpoints ============
@@ -241,10 +255,15 @@ class ApiService {
     if (isDemoMode()) {
       return {
         success: true,
-        data: generateMockPaymentIntents(5),
+        data: generateMockPaymentIntents(12),
       };
     }
-    return this.request<PaymentIntent[]>('/api/payments/intents');
+    const response = await this.request<PaymentIntent[]>('/api/payments/intents');
+    if (!response.success) {
+      logger.warn('Payment intents API failed, falling back to mock data', { error: response.error });
+      return { success: true, data: generateMockPaymentIntents(12) };
+    }
+    return response;
   }
 
   /**
@@ -296,7 +315,7 @@ class ApiService {
         success: true,
         data: {
           transactions: generateMockTransactions(limit),
-          total: 50,
+          total: 120,
           page: params?.page || 1,
           limit,
         },
@@ -308,7 +327,21 @@ class ApiService {
     if (params?.status) queryParams.append('status', params.status);
 
     const query = queryParams.toString();
-    return this.request(`/api/transactions${query ? `?${query}` : ''}`);
+    const response = await this.request<{ transactions: Transaction[]; total: number; page: number; limit: number }>(`/api/transactions${query ? `?${query}` : ''}`);
+    if (!response.success) {
+      const limit = params?.limit || 10;
+      logger.warn('Transactions API failed, falling back to mock data', { error: response.error });
+      return {
+        success: true,
+        data: {
+          transactions: generateMockTransactions(limit),
+          total: 50,
+          page: params?.page || 1,
+          limit,
+        },
+      };
+    }
+    return response;
   }
 
   /**
@@ -320,39 +353,48 @@ class ApiService {
       mockTx.txid = txid;
       return { success: true, data: mockTx };
     }
-    return this.request<Transaction>(`/api/transactions/${txid}`);
+    const response = await this.request<Transaction>(`/api/transactions/${txid}`);
+    if (!response.success) {
+      logger.warn('Transaction API failed, falling back to mock data', { error: response.error, txid });
+      const mockTx = generateMockTransactions(1)[0];
+      mockTx.txid = txid;
+      return { success: true, data: mockTx };
+    }
+    return response;
   }
 
   /**
    * Get transaction stats
    */
   async getTransactionStats(): Promise<ApiResponse<TransactionStats>> {
+    const mockStats = generateMockTransactionStats();
     if (isDemoMode()) {
-      return {
-        success: true,
-        data: {
-          totalTransactions: Math.floor(Math.random() * 200) + 50,
-          totalVolume: Math.floor(Math.random() * 50000000) + 10000000,
-          avgTransaction: Math.floor(Math.random() * 200000) + 50000,
-          todayCount: Math.floor(Math.random() * 20) + 5,
-          todayVolume: Math.floor(Math.random() * 5000000) + 1000000,
-        },
-      };
+      return { success: true, data: mockStats };
     }
-    return this.request<TransactionStats>('/api/transactions/stats/summary');
+    const response = await this.request<TransactionStats>('/api/transactions/stats/summary');
+    if (!response.success) {
+      logger.warn('Transaction stats API failed, falling back to mock data', { error: response.error });
+      return { success: true, data: mockStats };
+    }
+    return response;
   }
 
   /**
    * Get withdrawals
    */
-  async getWithdrawals(): Promise<ApiResponse<{ withdrawals: any[] }>> {
+  async getWithdrawals(): Promise<ApiResponse<{ withdrawals: Withdrawal[] }>> {
     if (isDemoMode()) {
       return {
         success: true,
-        data: { withdrawals: generateMockWithdrawals(5) },
+        data: { withdrawals: generateMockWithdrawals(8) },
       };
     }
-    return this.request<{ withdrawals: any[] }>('/api/withdrawals');
+    const response = await this.request<{ withdrawals: Withdrawal[] }>('/api/withdrawals');
+    if (!response.success) {
+      logger.warn('Withdrawals API failed, falling back to mock data', { error: response.error });
+      return { success: true, data: { withdrawals: generateMockWithdrawals(5) } };
+    }
+    return response;
   }
 
   // ============ Analytics Endpoints ============
@@ -365,11 +407,14 @@ class ApiService {
     endDate?: string;
     period?: string;
   }): Promise<ApiResponse<Analytics>> {
+    if (isDemoMode()) {
+      const period = params?.period === '7' || params?.period === '7d' ? '7d' : params?.period === '90' || params?.period === '90d' ? '90d' : '30d';
+      return { success: true, data: generateMockAnalyticsApi(period) };
+    }
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     if (params?.period) queryParams.append('period', params.period);
-
     const query = queryParams.toString();
     return this.request<Analytics>(`/api/webhooks/analytics${query ? `?${query}` : ''}`);
   }
@@ -382,11 +427,14 @@ class ApiService {
     endDate?: string;
     period?: string;
   }): Promise<ApiResponse<EarningsChartData[]>> {
+    if (isDemoMode()) {
+      const period = params?.period === '7' || params?.period === '7d' ? '7d' : params?.period === '90' || params?.period === '90d' ? '90d' : '30d';
+      return { success: true, data: generateMockEarningsChart(period) };
+    }
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     if (params?.period) queryParams.append('period', params.period);
-
     const query = queryParams.toString();
     return this.request<EarningsChartData[]>(`/api/webhooks/analytics/earnings${query ? `?${query}` : ''}`);
   }

@@ -1,6 +1,6 @@
 // API Response Types
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -113,7 +113,7 @@ export interface PaymentIntent {
   description?: string;
   contentUrl?: string;
   contentId?: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   isRecurring: boolean;
   recurrenceInterval?: string;
   expiresAt?: string;
@@ -132,7 +132,7 @@ export interface CreatePaymentIntentRequest {
   description?: string;
   contentUrl?: string;
   contentId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   isRecurring?: boolean;
   recurrenceInterval?: string;
   expiresInHours?: number;
@@ -159,7 +159,7 @@ export interface Transaction {
   status: 'pending' | 'confirmed' | 'failed';
   confirmations: number;
   blockHeight?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   confirmedAt?: string;
 }
@@ -199,6 +199,18 @@ export interface TopSupporter {
   totalAmount: number;
   transactionCount: number;
   lastTransaction: string;
+}
+
+// Withdrawal Types
+export interface Withdrawal {
+  id: string;
+  amount?: number;
+  amountSats?: number;
+  fee?: number;
+  status: string;
+  txid?: string;
+  createdAt: string;
+  completedAt?: string;
 }
 
 // Webhook Types

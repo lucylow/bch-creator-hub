@@ -160,11 +160,30 @@ class Transaction {
         COUNT(DISTINCT sender_address) as unique_senders
        FROM transactions 
        WHERE creator_id = $1 
+         AND (metadata->>'source' IS NULL OR metadata->>'source' != 'stripe')
          AND ($2::timestamp IS NULL OR indexed_at >= $2)
          AND ($3::timestamp IS NULL OR indexed_at <= $3)`,
       [creatorId, startDate, endDate]
     );
     
+    return result.rows[0];
+  }
+
+  /**
+   * Get Stripe payment stats for a creator (transactions where metadata.source = 'stripe').
+   */
+  static async getStripeStats(creatorId, startDate, endDate) {
+    const result = await query(
+      `SELECT 
+        COUNT(*) as transaction_count,
+        COALESCE(SUM((metadata->>'amount_cents')::bigint), 0) as total_cents
+       FROM transactions 
+       WHERE creator_id = $1 
+         AND metadata->>'source' = 'stripe'
+         AND ($2::timestamp IS NULL OR indexed_at >= $2)
+         AND ($3::timestamp IS NULL OR indexed_at <= $3)`,
+      [creatorId, startDate, endDate]
+    );
     return result.rows[0];
   }
 }

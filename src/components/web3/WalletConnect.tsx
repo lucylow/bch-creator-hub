@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/contexts/WalletContext';
 import { bchProvider } from '@/lib/web3/providers/BCHProvider';
+import { useBCHNetwork } from '@/lib/web3/hooks/useBCHNetwork';
 import { Wallet, LogOut, Copy, Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatBCH, truncateAddress } from '@/lib/web3/utils/bch';
@@ -32,6 +33,7 @@ const WalletConnect: React.FC = () => {
     disconnect,
     refreshBalance
   } = useWallet();
+  const { getAddressExplorerUrl, isTestnet } = useBCHNetwork();
 
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,8 +85,8 @@ const WalletConnect: React.FC = () => {
 
   const handleViewOnExplorer = () => {
     if (address) {
-      const explorerUrl = `https://blockchair.com/bitcoin-cash/address/${address}`;
-      window.open(explorerUrl, '_blank');
+      const explorerUrl = getAddressExplorerUrl(address);
+      if (explorerUrl && explorerUrl !== '#') window.open(explorerUrl, '_blank');
     }
   };
 
@@ -92,8 +94,11 @@ const WalletConnect: React.FC = () => {
     const icons: Record<string, string> = {
       paytaca: '🦜',
       electronCash: '⚡',
+      'electron-cash': '⚡',
       generic: '₿',
-      walletConnect: '🔗'
+      walletConnect: '🔗',
+      libauth: '🔐',
+      demo: '🧪'
     };
     return icons[type] || '👛';
   };
@@ -189,7 +194,14 @@ const WalletConnect: React.FC = () => {
         <DropdownMenuContent align="end" className="w-64">
           <div className="px-2 py-1.5">
             <div className="text-sm font-mono break-all">{address}</div>
-            <div className="text-xs text-muted-foreground mt-1">Wallet Address</div>
+            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+              Wallet Address
+              {isTestnet && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
+                  Testnet
+                </span>
+              )}
+            </div>
           </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleCopyAddress} className="cursor-pointer">
@@ -205,7 +217,11 @@ const WalletConnect: React.FC = () => {
               </>
             )}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleViewOnExplorer} className="cursor-pointer">
+          <DropdownMenuItem
+            onClick={handleViewOnExplorer}
+            className="cursor-pointer"
+            disabled={!address || getAddressExplorerUrl(address || '') === '#'}
+          >
             <ExternalLink className="w-4 h-4 mr-2" />
             View on Explorer
           </DropdownMenuItem>

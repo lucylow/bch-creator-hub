@@ -53,6 +53,7 @@
     "qrcode": "^1.5.4",
     "redis": "^4.6.7",
     "socket.io": "^4.6.1",
+    "stripe": "^14.25.0",
     "swagger-ui-express": "^4.6.3",
     "uuid": "^9.0.0",
     "winston": "^3.9.0",

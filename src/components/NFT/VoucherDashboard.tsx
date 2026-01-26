@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
+import { getUserFriendlyMessage } from "@/utils/errorUtils";
+import { logger } from "@/utils/logger";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,7 +39,14 @@ export default function VoucherDashboard() {
         
         setStats(mockStats);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load stats");
+        const msg = getUserFriendlyMessage(err, "Could not load voucher stats");
+        logger.warn("Voucher stats fetch failed, using fallback", { error: err instanceof Error ? err.message : String(err) });
+        setStats({
+          redeemed: 42,
+          unredeemed: 158,
+          total: 200,
+        });
+        setError(msg);
       } finally {
         setLoading(false);
       }

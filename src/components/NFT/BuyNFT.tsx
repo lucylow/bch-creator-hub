@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
-import { parseEther, encodeAbiParameters, parseAbiParameters } from 'viem';
+import { parseEther } from 'viem';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
+import { logger } from '@/utils/logger';
 import { MARKETPLACE_ADDRESS } from '@/lib/web3/providers/EVMProvider';
 
 // Marketplace ABI (minimal - full ABI available after compilation)
@@ -101,10 +104,11 @@ export default function BuyNFT() {
         functionName: 'redeem',
         args: [voucher, signature as `0x${string}`],
         value: parseEther(price),
-      } as any);
+      });
     } catch (err) {
-      console.error('Redeem error:', err);
-      toast.error('Failed to redeem voucher');
+      const msg = getUserFriendlyMessage(err, 'Failed to redeem voucher');
+      logger.error('Redeem error', err instanceof Error ? err : new Error(String(err)), { seller, tokenURI: tokenURI?.slice(0, 50) });
+      toast.error(msg);
     }
   };
 
@@ -145,6 +149,25 @@ export default function BuyNFT() {
             </AlertDescription>
           </Alert>
         )}
+
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full gap-2">
+              Paste voucher JSON
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Textarea
+              placeholder='{"seller":"0x...","uri":"ipfs://...","price":"0.1","nonce":"0","signature":"0x..."}'
+              className="mt-2 font-mono text-xs min-h-[100px]"
+              onPaste={(e) => {
+                const text = e.clipboardData.getData('text');
+                if (text.trim()) fillFromJson(text);
+              }}
+            />
+          </CollapsibleContent>
+        </Collapsible>
 
         <div className="space-y-2">
           <Label htmlFor="seller">Seller Address</Label>

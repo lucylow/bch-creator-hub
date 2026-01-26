@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, Copy, ExternalLink, Globe, Calendar, Zap } from 'lucide-react';
+import { CheckCircle, Copy, ExternalLink, Globe, Calendar, Zap, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { formatBCH, truncateAddress } from '@/utils/formatters';
@@ -33,6 +33,7 @@ const PaymentPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [amount, setAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [stripeRedirecting, setStripeRedirecting] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [txHash, setTxHash] = useState('');
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -64,7 +65,7 @@ const PaymentPage = () => {
       });
       setIsLoading(false);
     }, 500);
-  }, [paymentId]);
+  }, [paymentId, creatorInfo.address]);
 
   useEffect(() => {
     if (creatorId) loadDetails();
@@ -73,6 +74,51 @@ const PaymentPage = () => {
   useEffect(() => {
     setPaymentType(paymentTypeFromSlug(paymentId));
   }, [paymentId]);
+
+  const handlePayWithCard = async () => {
+    const amountCents = Math.round((parseFloat(amount) || 0) * 100);
+    if (amountCents < 50) {
+      toast.error('Minimum amount for card is $0.50');
+      return;
+    }
+    if (!creatorId) {
+      toast.error('Invalid payment link');
+      return;
+    }
+    const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const origin = window.location.origin;
+    try {
+      setStripeRedirecting(true);
+      const res = await fetch(`${apiBase}/api/stripe/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creatorId,
+          amountCents,
+          currency: 'usd',
+          successUrl: `${origin}/pay/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${origin}/pay/${creatorId}`,
+          description: paymentDetails.description || 'Creator support'
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.error || data?.message || (data?.data ? JSON.stringify(data.data) : 'Card payment unavailable');
+        toast.error(typeof msg === 'string' ? msg : 'Card payment failed');
+        return;
+      }
+      const url = data?.data?.url;
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      toast.error('Could not start checkout');
+    } catch {
+      toast.error('Card payment failed');
+    } finally {
+      setStripeRedirecting(false);
+    }
+  };
 
   const handlePayment = async () => {
     if (!isConnected) {
@@ -282,6 +328,20 @@ const PaymentPage = () => {
                   {formatBCH(paymentDetails.amountSats || Math.round((parseFloat(amount || '0') || 0) * 100000000))}
                 </span>
               </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground mb-2">Or pay with card (amount in USD)</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handlePayWithCard}
+                disabled={stripeRedirecting || !amount || parseFloat(amount || '0') < 0.5}
+              >
+                <CreditCard className="w-4 h-4" />
+                {stripeRedirecting ? 'Redirecting…' : 'Pay with card'}
+              </Button>
             </div>
 
             <p className="text-xs text-muted-foreground text-center mt-4">

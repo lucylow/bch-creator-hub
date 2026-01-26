@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Route } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/Common/ThemeToggle';
 
 const navLinks = [
   { href: '#use-cases', label: 'Use Cases' },
@@ -147,7 +148,7 @@ const Navbar = () => {
 
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors relative z-50"
+          className="md:hidden p-3 rounded-xl hover:bg-muted transition-colors relative z-50 min-h-[44px] min-w-[44px] flex items-center justify-center"
           onClick={() => setIsOpen(!isOpen)}
           aria-label="Toggle menu"
         >
@@ -214,6 +215,9 @@ const Navbar = () => {
                 </div>
 
                 <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex justify-center pb-2">
+                    <ThemeToggle variant="outline" />
+                  </div>
                   <Link to="/dashboard">
                     <Button
                       variant="outline"

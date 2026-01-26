@@ -18,6 +18,8 @@ const withdrawalRoutes = require('./routes/withdrawal.routes');
 const contractWithdrawRoutes = require('./routes/contract-withdraw.routes');
 const cashtokenRoutes = require('./routes/cashtoken.routes');
 const walletRoutes = require('./routes/wallet.routes');
+const stripeRoutes = require('./routes/stripe.routes');
+const stripeController = require('./controllers/stripe.controller');
 
 const errorHandler = require('./middleware/error.middleware');
 const BCHService = require('./services/bch.service');
@@ -118,6 +120,7 @@ class App {
     this.app.use('/api/contract', contractWithdrawRoutes);
     this.app.use('/api/cashtokens', cashtokenRoutes);
     this.app.use('/api/wallet', walletRoutes);
+    this.app.use('/api/stripe', stripeRoutes);
     this.app.use('/api', payloadRoutes);
     
     // Bull Board for queue monitoring

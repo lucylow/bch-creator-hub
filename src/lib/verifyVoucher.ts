@@ -27,7 +27,7 @@ export function verifyVoucher(
 
     return (
       recovered.toLowerCase() ===
-      (process.env.NEXT_PUBLIC_SIGNER_ADDRESS || "").toLowerCase()
+      (import.meta.env.VITE_SIGNER_ADDRESS || "").toLowerCase()
     );
   } catch {
     return false;
@@ -82,7 +82,7 @@ export async function verifyMetaVoucher(
 
     return (
       recovered.toLowerCase() ===
-      (process.env.NEXT_PUBLIC_SIGNER_ADDRESS || "").toLowerCase()
+      (import.meta.env.VITE_SIGNER_ADDRESS || "").toLowerCase()
     );
   } catch {
     return false;

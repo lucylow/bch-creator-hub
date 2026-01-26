@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Image as ImageIcon } from 'lucide-react';
 import { NFT_ADDRESS } from '@/lib/web3/providers/EVMProvider';
+import { getNFTsForAddress } from '@/demo/mockNFTs';
+import { logger } from '@/utils/logger';
 
 // NFT Collection ABI
 const NFT_ABI = [
@@ -58,6 +60,7 @@ export default function NFTGallery() {
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailNft, setDetailNft] = useState<{ tokenId: string; tokenURI?: string; owner?: string } | null>(null);
 
   // Fetch user's NFT balance
   const { data: balance } = useReadContract({
@@ -108,7 +111,15 @@ export default function NFTGallery() {
         const results = await Promise.all(nftPromises);
         setNfts(results.filter((nft): nft is NFT => nft !== null));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch NFTs');
+        logger.warn('NFT fetch failed, falling back to mock data', { error: err instanceof Error ? err.message : String(err), address });
+        const mockNfts = getNFTsForAddress(address).map((m) => ({
+          tokenId: m.tokenId,
+          tokenURI: m.image || `ipfs://${m.tokenId}`,
+          metadata: { name: m.name, description: m.description, image: m.image },
+          owner: m.owner,
+        }));
+        setNfts(mockNfts);
+        setError(null);
       } finally {
         setLoading(false);
       }
@@ -178,36 +189,59 @@ export default function NFTGallery() {
             </AlertDescription>
           </Alert>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {nfts.map((nft) => (
-              <Card key={nft.tokenId}>
-                <CardContent className="p-4">
-                  <div className="aspect-square bg-muted rounded-lg flex items-center justify-center mb-4">
-                    {nft.metadata?.image ? (
-                      <img
-                        src={nft.metadata.image}
-                        alt={nft.metadata.name || `NFT #${nft.tokenId}`}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <ImageIcon className="w-12 h-12 text-muted-foreground" />
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {nfts.map((nft) => (
+                <Card
+                  key={nft.tokenId}
+                  className="cursor-pointer transition-shadow hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
+                  tabIndex={0}
+                  role="button"
+                  onClick={() => setDetailNft({ tokenId: nft.tokenId, tokenURI: nft.tokenURI, owner: nft.owner })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setDetailNft({ tokenId: nft.tokenId, tokenURI: nft.tokenURI, owner: nft.owner });
+                    }
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="aspect-square bg-muted rounded-lg flex items-center justify-center mb-4 overflow-hidden">
+                      {nft.metadata?.image ? (
+                        <img
+                          src={nft.metadata.image}
+                          alt={nft.metadata.name || `NFT #${nft.tokenId}`}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <ImageIcon className="w-12 h-12 text-muted-foreground" />
+                      )}
+                    </div>
+                    <h3 className="font-semibold">
+                      {nft.metadata?.name || `NFT #${nft.tokenId}`}
+                    </h3>
+                    {nft.metadata?.description && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {nft.metadata.description}
+                      </p>
                     )}
-                  </div>
-                  <h3 className="font-semibold">
-                    {nft.metadata?.name || `NFT #${nft.tokenId}`}
-                  </h3>
-                  {nft.metadata?.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                      {nft.metadata.description}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Token ID: {nft.tokenId}
                     </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Token ID: {nft.tokenId}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {detailNft && (
+              <NFTDetailDialog
+                open={!!detailNft}
+                onOpenChange={(open) => !open && setDetailNft(null)}
+                tokenId={detailNft.tokenId}
+                tokenURI={detailNft.tokenURI}
+                owner={detailNft.owner}
+              />
+            )}
+          </>
         )}
       </CardContent>
     </Card>

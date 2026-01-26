@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
+import { logger } from '@/utils/logger';
 import { NFT_ADDRESS } from '@/lib/web3/providers/EVMProvider';
 
 // NFT Collection ABI (minimal - full ABI available after compilation)
@@ -63,10 +65,11 @@ export default function MintForm() {
         abi: NFT_ABI,
         functionName: 'mint',
         args: [address, tokenURI],
-      } as any);
+      });
     } catch (err) {
-      console.error('Mint error:', err);
-      toast.error('Failed to mint NFT');
+      const msg = getUserFriendlyMessage(err, 'Failed to mint NFT');
+      logger.error('Mint error', err instanceof Error ? err : new Error(String(err)), { tokenURI: tokenURI.slice(0, 50) });
+      toast.error(msg);
     } finally {
       setIsMinting(false);
     }

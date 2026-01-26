@@ -38,14 +38,14 @@ const WithdrawalsPage = () => {
   const withdrawals = data?.withdrawals || [];
   const filteredWithdrawals = filterStatus === 'all' 
     ? withdrawals 
-    : withdrawals.filter((w: any) => w.status === filterStatus);
+    : withdrawals.filter((w: { status: string }) => w.status === filterStatus);
 
   const totalWithdrawn = withdrawals
-    .filter((w: any) => w.status === 'confirmed')
-    .reduce((sum: number, w: any) => sum + (w.amountSats || 0), 0);
+    .filter((w: { status: string }) => w.status === 'confirmed')
+    .reduce((sum: number, w: { amountSats?: number }) => sum + (w.amountSats || 0), 0);
 
-  const pendingWithdrawals = withdrawals.filter((w: any) => w.status === 'pending');
-  const pendingAmount = pendingWithdrawals.reduce((sum: number, w: any) => sum + (w.amountSats || 0), 0);
+  const pendingWithdrawals = withdrawals.filter((w: { status: string }) => w.status === 'pending');
+  const pendingAmount = pendingWithdrawals.reduce((sum: number, w: { amountSats?: number }) => sum + (w.amountSats || 0), 0);
 
   const getStatusType = (status: string): 'success' | 'pending' | 'failed' => {
     switch (status) {
@@ -201,7 +201,7 @@ const WithdrawalsPage = () => {
               {status.charAt(0).toUpperCase() + status.slice(1)}
               {status !== 'all' && (
                 <span className="ml-1.5 opacity-70">
-                  ({withdrawals.filter((w: any) => status === 'all' || w.status === status).length})
+                  ({withdrawals.filter((w: { status: string }) => status === 'all' || w.status === status).length})
                 </span>
               )}
             </button>
@@ -244,7 +244,7 @@ const WithdrawalsPage = () => {
           ) : (
             <div className="divide-y divide-border/50">
               <AnimatePresence mode="popLayout">
-                {filteredWithdrawals.map((withdrawal: any, index: number) => (
+                {filteredWithdrawals.map((withdrawal: { id: string; amountSats?: number; status: string; createdAt: string; txid?: string }, index: number) => (
                   <motion.div
                     key={withdrawal.id}
                     initial={{ opacity: 0, x: -10 }}

@@ -115,7 +115,17 @@ export const generateUnifiedPaymentURI = (
   return qs ? `bitcoincash:${addr}?${qs}` : `bitcoincash:${addr}`;
 };
 
-export const parseTransaction = (tx: any) => {
+interface ParsedTxInput {
+  txid?: string;
+  value?: number;
+  confirmations?: number;
+  blockTime?: number;
+  vin?: unknown[];
+  vout?: unknown[];
+  fees?: number;
+}
+
+export const parseTransaction = (tx: ParsedTxInput) => {
   return {
     txid: tx.txid,
     amount: tx.value,

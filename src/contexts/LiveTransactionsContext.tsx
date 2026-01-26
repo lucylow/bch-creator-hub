@@ -90,7 +90,7 @@ export function LiveTransactionsProvider({ children, creatorId }: LiveTransactio
       onBalanceUpdate,
       onWithdrawalStatus,
     }),
-    [isConnected, onPaymentReceived, onPaymentsBatch, onPaymentConfirmed, onBalanceUpdate, onWithdrawalStatus]
+    [isConnected, onPaymentReceived, onPaymentConfirmed, onBalanceUpdate, onWithdrawalStatus]
   );
 
   return (

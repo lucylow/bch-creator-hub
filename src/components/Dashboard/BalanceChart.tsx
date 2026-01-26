@@ -6,8 +6,9 @@ type DataPoint = { label: string; value: number };
 
 type Props = { data?: DataPoint[]; type?: 'line' | 'area' };
 
+type TooltipPayload = { active?: boolean; payload?: Array<{ value?: number }>; label?: string };
 // Using forwardRef to avoid React warning with Recharts Tooltip
-const CustomTooltip = forwardRef<HTMLDivElement, any>(({ active, payload, label }, ref) => {
+const CustomTooltip = forwardRef<HTMLDivElement, TooltipPayload>(({ active, payload, label }, ref) => {
   if (active && payload && payload.length) {
     return (
       <div ref={ref} className="glass-card rounded-lg p-3 border border-border shadow-lg">

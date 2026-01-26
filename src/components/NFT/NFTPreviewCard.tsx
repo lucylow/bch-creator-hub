@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getUserFriendlyMessage } from "@/utils/errorUtils";
 
 interface NFTMetadata {
   name: string;
@@ -36,7 +37,7 @@ export default function NFTPreviewCard({ uri }: NFTPreviewCardProps) {
         const json = await res.json();
         setMeta(json);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load metadata");
+        setError(getUserFriendlyMessage(err, "Failed to load metadata"));
       } finally {
         setLoading(false);
       }

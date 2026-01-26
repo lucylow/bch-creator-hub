@@ -35,6 +35,7 @@
 - [Security](#security)
 - [Performance](#performance)
 - [Development](#development)
+- [Documentation](#documentation)
 - [Use Cases](#use-cases)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -920,7 +921,7 @@ sequenceDiagram
    cp .env.example .env
    ```
 
-   Edit `.env`:
+   Edit `.env` (see [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for a full list of backend variables):
    ```env
    # Server
    PORT=3001
@@ -984,7 +985,7 @@ sequenceDiagram
    ```
 
 3. **Configure environment**:
-   Create `.env`:
+   Create `.env` in the project root (see [Environment variables](docs/ENVIRONMENT.md) for a full list):
    ```env
    VITE_API_URL=http://localhost:3001
    VITE_WS_URL=ws://localhost:3001
@@ -996,7 +997,7 @@ sequenceDiagram
    npm run dev
    ```
 
-   The frontend will be available at `http://localhost:8080`
+   The frontend will be available at the URL Vite prints (e.g. `http://localhost:8080` when `PORT=8080`, or `http://localhost:5173` by default).
 
 ### Bitcoin Cash Node Configuration
 
@@ -1022,8 +1023,8 @@ zmqpubhashtx=tcp://127.0.0.1:28333
 
 ### Authentication
 
-#### POST `/api/auth/login`
-Authenticate using BIP-322 message signature.
+#### POST `/api/auth/wallet`
+Authenticate using BIP-322 message signature. (Legacy alias: `/api/auth/login`.)
 
 **Request Body**:
 ```json
@@ -1439,6 +1440,16 @@ npm run test:watch
 
 ---
 
+## Documentation
+
+- **[docs/README.md](docs/README.md)** — Index of all documentation (architecture, API, env vars, NFT setup, demo mode, Web3, BCH ecosystem).
+- **[docs/ENVIRONMENT.md](docs/ENVIRONMENT.md)** — Environment variables for frontend, backend, and contracts.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — How to contribute, code style, and pull request process.
+
+For API integration details and endpoint mapping, see [docs/API_INTEGRATION_IMPROVEMENTS.md](docs/API_INTEGRATION_IMPROVEMENTS.md).
+
+---
+
 ## Use Cases
 
 ### Content Creators
@@ -1537,7 +1548,8 @@ npm run test:watch
 ### Getting Help
 
 - **GitHub Issues**: Open an issue for bugs or feature requests
-- **Documentation**: Check the `/docs` directory for detailed documentation
+- **Documentation**: See the [documentation index](docs/README.md) and the `docs/` directory for detailed docs
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development and PR guidelines
 - **Community**: Join our Discord server for support
 - **Email**: Contact the development team for enterprise support
 
@@ -1545,7 +1557,9 @@ npm run test:watch
 
 ## Contributing
 
-We welcome contributions! Here's how you can help:
+We welcome contributions! For full guidelines (setup, code style, testing, PR process), see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+Summary:
 
 1. **Fork the repository**
 2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
@@ -1558,9 +1572,9 @@ We welcome contributions! Here's how you can help:
 
 ### Contribution Guidelines
 
-- Follow the existing code style
+- Follow the existing code style (ESLint, Prettier, TypeScript)
 - Write tests for new features
-- Update documentation as needed
+- Update documentation as needed (and [docs/README.md](docs/README.md) if you add or move docs)
 - Ensure all tests pass before submitting
 - Write clear commit messages
 - Reference issues in pull requests

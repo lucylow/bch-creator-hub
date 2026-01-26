@@ -18,7 +18,7 @@ const StatsSection = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             viewport={{ once: true }}
-            className="glass-card rounded-xl p-6 text-center hover:border-primary transition-all duration-300 hover:-translate-y-1"
+            className="glass-card rounded-xl p-6 text-center hover:border-primary/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
           >
             <div className="font-heading text-4xl font-bold text-gradient mb-2">{stat.value}</div>
             <p className="text-muted-foreground text-sm">{stat.label}</p>

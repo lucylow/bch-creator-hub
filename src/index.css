@@ -42,6 +42,7 @@
     --ring: 162 87% 37%;
 
     --radius: 0.75rem;
+    --nav-height: 4.5rem;
 
     /* Success/Warning/Error states */
     --success: 162 87% 37%;
@@ -186,9 +187,39 @@
     box-shadow: var(--shadow-medium);
   }
 
-  /* Smooth scrolling */
+  /* Smooth scrolling and anchor offset for fixed nav */
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: var(--nav-height, 4.5rem);
+  }
+
+  [id] {
+    scroll-margin-top: var(--nav-height, 4.5rem);
+  }
+
+  /* Consistent top spacing for app pages below fixed nav */
+  .app-page {
+    min-height: 100vh;
+    padding-top: max(var(--nav-height, 4.5rem), 6rem);
+    padding-bottom: 3rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  @media (min-width: 640px) {
+    .app-page {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    html { scroll-behavior: auto; }
   }
 
   /* Better focus styles for accessibility */
@@ -229,6 +260,14 @@
   .hover-lift:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-medium);
+  }
+
+  /* Gradient button hover */
+  .bg-gradient-primary:hover {
+    filter: brightness(1.06);
+  }
+  .bg-gradient-primary:active {
+    filter: brightness(0.98);
   }
 
   /* Pulse glow animation for live indicators */
@@ -326,5 +365,16 @@
     50% {
       box-shadow: 0 0 12px hsl(var(--warning) / 0.5);
     }
+  }
+}
+
+/* QR code modal: clean print layout */
+@media print {
+  [data-state="open"] [data-radix-dialog-overlay] {
+    background: transparent !important;
+  }
+  #qr-code-modal {
+    box-shadow: none !important;
+    border: 1px solid hsl(var(--border));
   }
 }

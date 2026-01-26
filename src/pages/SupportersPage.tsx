@@ -33,7 +33,7 @@ const SupportersPage = () => {
   // Process transactions to get supporter stats
   const supportersMap = new Map();
   if (data?.transactions) {
-    data.transactions.forEach((tx: any) => {
+    data.transactions.forEach((tx: { senderAddress?: string; from?: string; amountSats?: number; createdAt?: string; timestamp?: string }) => {
       const address = tx.senderAddress || tx.from;
       if (address && tx.amountSats) {
         if (!supportersMap.has(address)) {
@@ -63,13 +63,13 @@ const SupportersPage = () => {
     .sort((a, b) => b.totalAmount - a.totalAmount);
 
   const filteredSupporters = searchQuery
-    ? supporters.filter((s: any) =>
+    ? supporters.filter((s: { address: string }) =>
         s.address.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : supporters;
 
   const totalSupporters = supporters.length;
-  const totalAmount = supporters.reduce((sum: number, s: any) => sum + s.totalAmount, 0);
+  const totalAmount = supporters.reduce((sum: number, s: { totalAmount: number }) => sum + s.totalAmount, 0);
   const avgSupport = totalSupporters > 0 ? totalAmount / totalSupporters : 0;
   const topSupporter = supporters[0];
 
@@ -218,7 +218,7 @@ const SupportersPage = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredSupporters.map((supporter: any, index: number) => (
+              {filteredSupporters.map((supporter: { address: string; totalAmount: number; transactionCount: number; firstSeen: string; lastSeen: string }, index: number) => (
                 <motion.div
                   key={supporter.address}
                   initial={{ opacity: 0, x: -20 }}

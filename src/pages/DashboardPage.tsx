@@ -64,8 +64,8 @@ const DashboardPage = () => {
 
     // Handle backend response format (balance, stats objects)
     if ('balance' in dashboardData && 'stats' in dashboardData) {
-      const balance = dashboardData.balance as any;
-      const stats = dashboardData.stats as any;
+      const balance = dashboardData.balance as Record<string, unknown> | undefined;
+      const stats = dashboardData.stats as Record<string, unknown> | undefined;
       return {
         totalBalance: balance?.total_balance || balance?.total || 0,
         todayEarnings: parseInt(stats?.today_earnings || stats?.todayEarnings || 0),
@@ -93,7 +93,7 @@ const DashboardPage = () => {
     
     // Handle backend response format (chartData array)
     if ('chartData' in dashboardData && Array.isArray(dashboardData.chartData)) {
-      return dashboardData.chartData.map((item: any, index: number) => ({
+      return dashboardData.chartData.map((item: { date?: string; amount?: number; value?: number }, index: number) => ({
         label: item.date ? new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }) : `Day ${index + 1}`,
         value: parseInt(item.amount || item.value || 0),
       }));
@@ -101,7 +101,7 @@ const DashboardPage = () => {
 
     // Handle DashboardStats format (earningsChart array)
     if ('earningsChart' in dashboardData && Array.isArray(dashboardData.earningsChart)) {
-      return dashboardData.earningsChart.map((item: any, index: number) => ({
+      return dashboardData.earningsChart.map((item: { date: string; amount?: number }, index: number) => ({
         label: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }) || `Day ${index + 1}`,
         value: parseInt(item.amount || 0),
       }));
@@ -116,9 +116,9 @@ const DashboardPage = () => {
     
     const txList = ('recentTransactions' in dashboardData 
       ? dashboardData.recentTransactions 
-      : (dashboardData as any).recentTransactions) || [];
+      : (dashboardData as { recentTransactions?: unknown[] }).recentTransactions) || [];
     
-    return txList.map((tx: any) => ({
+    return txList.map((tx: Record<string, unknown>) => ({
       id: tx.id || tx.txid,
       txid: tx.txid,
       creatorId: tx.creator_id || tx.creatorId || creator?.id || '',
@@ -242,7 +242,7 @@ const DashboardPage = () => {
         </motion.div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8" aria-label="Key metrics">
           <StatCard
             title="Total Balance"
             value={formatBCH(stats.totalBalance)}
@@ -295,7 +295,7 @@ const DashboardPage = () => {
             trend="Ultra Low"
             color="red"
           />
-        </div>
+        </section>
 
         {/* Chart and Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -310,19 +310,26 @@ const DashboardPage = () => {
                 <h2 className="text-xl font-semibold text-foreground mb-1">Earnings Overview</h2>
                 <p className="text-sm text-muted-foreground">Track your earnings over time</p>
               </div>
-              <div className="flex gap-2">
-                {([
-                  { key: '7d' as ChartPeriod, label: '7 days' },
-                  { key: '30d' as ChartPeriod, label: '30 days' },
-                  { key: '90d' as ChartPeriod, label: '90 days' },
-                ]).map(({ key, label }) => (
+              <div
+                role="group"
+                aria-label="Chart period"
+                className="inline-flex p-1 rounded-xl bg-muted/60 border border-border/50"
+              >
+                {[
+                  { key: '7d' as ChartPeriod, label: '7d' },
+                  { key: '30d' as ChartPeriod, label: '30d' },
+                  { key: '90d' as ChartPeriod, label: '90d' },
+                ].map(({ key, label }) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setChartPeriod(key)}
-                    className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${
+                    aria-pressed={chartPeriod === key}
+                    aria-label={`${label} view`}
+                    className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${
                       chartPeriod === key
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                        : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     }`}
                   >
                     {label}

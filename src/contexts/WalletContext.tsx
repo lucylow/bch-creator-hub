@@ -24,7 +24,7 @@ interface WalletContextType {
   walletType?: string;
   connect: (walletType?: string) => Promise<{ success: boolean; address?: string; error?: string }>;
   disconnect: () => void;
-  sendPayment: (toAddress: string, amountSats: number, payload?: string) => Promise<any>;
+  sendPayment: (toAddress: string, amountSats: number, payload?: string) => Promise<{ success: boolean; txid?: string; error?: string }>;
   fetchBalance: (addr: string) => Promise<void>;
   refreshBalance: () => Promise<void>;
 }
@@ -86,6 +86,83 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       fetchBalance(savedAddress);
     }
     setIsLoading(false);
+  }, [fetchBalance]);
+
+  const connect = useCallback(async (walletType = 'generic'): Promise<{ success: boolean; address?: string; error?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      const result = await walletService.connectWallet(walletType);
+      
+      if (result.success && result.address && result.signature && result.message) {
+        setWalletType(walletType);
+        const persistState = () => {
+          try {
+            localStorage.setItem('bch_wallet_state', JSON.stringify({
+              address: result.address,
+              walletType,
+              connected: true,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            logger.warn('Could not persist wallet state', e);
+          }
+        };
+
+        const isUsingMockData = result.signature.startsWith('demo_signature_') || walletType === 'demo';
+        
+        if (isUsingMockData || isDemoMode()) {
+          setAddress(result.address);
+          setIsConnected(true);
+          localStorage.setItem('wallet_address', result.address);
+          localStorage.setItem('auth_token', 'demo_token_' + btoa(result.address));
+          persistState();
+          await fetchBalance(result.address);
+          toast.success('Wallet connected (using demo data)');
+          return { success: true, address: result.address };
+        }
+        
+        try {
+          const authRes = await apiService.authenticateWallet({
+            address: result.address,
+            signature: result.signature,
+            message: result.message,
+          });
+          
+          if (authRes.success && authRes.data?.token) {
+            setAddress(result.address);
+            setIsConnected(true);
+            localStorage.setItem('wallet_address', result.address);
+            persistState();
+            await fetchBalance(result.address);
+            toast.success('Wallet connected successfully!');
+            return { success: true, address: result.address };
+          } else {
+            throw new Error(authRes.error || 'Authentication failed');
+          }
+        } catch (authError) {
+          logger.warn('Backend authentication failed, using mock data mode', authError);
+          setAddress(result.address);
+          setIsConnected(true);
+          localStorage.setItem('wallet_address', result.address);
+          localStorage.setItem('auth_token', 'demo_token_' + btoa(result.address));
+          persistState();
+          await fetchBalance(result.address);
+          toast.success('Wallet connected (using demo data)');
+          return { success: true, address: result.address };
+        }
+      }
+      
+      throw new Error(result.error || 'Authentication failed');
+      
+    } catch (error) {
+      const errorMessage = getUserFriendlyMessage(error, 'Failed to connect wallet');
+      logger.error('Wallet connection failed', error instanceof Error ? error : new Error(errorMessage), { walletType });
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
+    }
   }, [fetchBalance]);
 
   useEffect(() => {
@@ -180,80 +257,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('walletDisconnected', handleDisconnect);
       clearInterval(balanceInterval);
     };
-  }, [checkConnection, fetchBalance, address, isConnected]);
-
-  const connect = async (walletType = 'generic'): Promise<{ success: boolean; address?: string; error?: string }> => {
-    try {
-      setIsLoading(true);
-      
-      const result = await walletService.connectWallet(walletType);
-      
-      if (result.success && result.address && result.signature && result.message) {
-        // Store wallet type
-        setWalletType(walletType);
-        
-        // Check if using mock data (demo wallet fallback) - signature starts with "demo_signature_"
-        const isUsingMockData = result.signature.startsWith('demo_signature_') || walletType === 'demo';
-        
-        // Skip backend authentication for mock data
-        if (isUsingMockData || isDemoMode()) {
-          setAddress(result.address);
-          setIsConnected(true);
-          localStorage.setItem('wallet_address', result.address);
-          localStorage.setItem('auth_token', 'demo_token_' + btoa(result.address));
-          
-          await fetchBalance(result.address);
-          
-          toast.success('Wallet connected (using demo data)');
-          return { success: true, address: result.address };
-        }
-        
-        // Real mode: Authenticate with backend
-        try {
-          const authRes = await apiService.authenticateWallet({
-            address: result.address,
-            signature: result.signature,
-            message: result.message,
-          });
-          
-          if (authRes.success && authRes.data?.token) {
-            setAddress(result.address);
-            setIsConnected(true);
-            localStorage.setItem('wallet_address', result.address);
-            
-            await fetchBalance(result.address);
-            
-            toast.success('Wallet connected successfully!');
-            return { success: true, address: result.address };
-          } else {
-            throw new Error(authRes.error || 'Authentication failed');
-          }
-        } catch (authError) {
-          // If backend auth fails, fallback to mock data mode
-          logger.warn('Backend authentication failed, using mock data mode', authError);
-          setAddress(result.address);
-          setIsConnected(true);
-          localStorage.setItem('wallet_address', result.address);
-          localStorage.setItem('auth_token', 'demo_token_' + btoa(result.address));
-          
-          await fetchBalance(result.address);
-          
-          toast.success('Wallet connected (using demo data)');
-          return { success: true, address: result.address };
-        }
-      }
-      
-      throw new Error(result.error || 'Authentication failed');
-      
-    } catch (error) {
-      const errorMessage = getUserFriendlyMessage(error, 'Failed to connect wallet');
-      logger.error('Wallet connection failed', error instanceof Error ? error : new Error(errorMessage), { walletType });
-      toast.error(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [checkConnection, fetchBalance, address, isConnected, connect]);
 
   const disconnect = useCallback(() => {
     setAddress('');

@@ -1,12 +1,14 @@
 // BCH Provider - Core Web3 integration layer
 import { API } from '../api/client';
 import { getBlockExplorerUrl } from '../utils/bch';
+import { logger } from '@/utils/logger';
+import { normalizeError, getUserFriendlyMessage } from '@/utils/errorUtils';
 
 interface WalletInfo {
   name: string;
   icon: string;
   supportsBIP322: boolean;
-  instance: any;
+  instance: unknown;
 }
 
 interface WalletData {
@@ -17,8 +19,8 @@ interface WalletData {
     unconfirmed: number;
     total: number;
   };
-  utxos: any[];
-  wallet: any;
+  utxos: unknown[];
+  wallet: unknown;
   authenticated: boolean;
   authToken?: string;
 }
@@ -29,13 +31,13 @@ interface Balance {
   total: number;
 }
 
-type EventListener = (data?: any) => void;
+type EventListener = (data?: unknown) => void;
 
 export class BCHProvider {
   private network: string;
   private connected = false;
   private wallets: Record<string, WalletInfo> = {};
-  private contracts: Record<string, any> = {};
+  private contracts: Record<string, unknown> = {};
   private currentWallet: WalletData | null = null;
   private listeners: Map<string, Set<EventListener>> = new Map();
 
@@ -56,7 +58,7 @@ export class BCHProvider {
     }
   }
 
-  private onWalletConnected(data: any) {
+  private onWalletConnected(data: { type: string } & Record<string, unknown>) {
     // Handle wallet connection event from browser extension
     this.emit('walletConnected', data);
   }
@@ -75,7 +77,7 @@ export class BCHProvider {
     
     if (typeof window === 'undefined') return wallets;
 
-    const win = window as any;
+    const win = window as Window & { paytaca?: unknown; electronCash?: unknown; [key: string]: unknown };
     
     // Check for Paytaca wallet (most popular BCH wallet)
     if (win.paytaca) {
@@ -92,7 +94,7 @@ export class BCHProvider {
           instance: win.paytaca
         };
       } catch (error) {
-        console.warn('Paytaca wallet detected but not functional:', error);
+        logger.warn('Paytaca wallet detected but not functional', { error: normalizeError(error).message });
       }
     }
     
@@ -142,12 +144,18 @@ export class BCHProvider {
     return wallets;
   }
 
+  /** Resolve wallet key to handle electron-cash vs electronCash from walletService */
+  private resolveWalletKey(walletType: string): string {
+    if (walletType === 'electron-cash' && this.wallets.electronCash) return 'electronCash';
+    return walletType;
+  }
+
   async connectWallet(walletType = 'generic'): Promise<WalletData> {
     try {
       // Refresh wallet detection first
       await this.checkWalletInjection();
-      
-      const wallet = this.wallets[walletType];
+      const resolvedKey = this.resolveWalletKey(walletType);
+      const wallet = this.wallets[resolvedKey];
       
       if (!wallet) {
         // Provide helpful error message based on wallet type
@@ -162,12 +170,11 @@ export class BCHProvider {
 
       let accounts: string[] = [];
       
-      switch (walletType) {
+      switch (resolvedKey) {
         case 'paytaca':
           accounts = await this.connectPaytaca(wallet.instance);
           break;
         case 'electronCash':
-        case 'electron-cash':
           accounts = await this.connectElectronCash(wallet.instance);
           break;
         case 'walletConnect':
@@ -190,24 +197,23 @@ export class BCHProvider {
         throw new Error('Invalid Bitcoin Cash address returned from wallet');
       }
       
-      // Authenticate with backend
+      // Authenticate with backend (use resolvedKey for wallet lookup)
       let authResult: { token?: string } = {};
       try {
-        authResult = await this.authenticate(address, walletType);
+        authResult = await this.authenticate(address, resolvedKey);
       } catch (authError) {
-        console.warn('Backend authentication failed, continuing with local connection', authError);
-        // Continue without backend auth for demo/offline mode
+        logger.warn('Backend authentication failed, continuing with local connection', { error: normalizeError(authError).message });
       }
       
       // Load wallet balance
       const balance = await this.getBalance(address);
       
       // Get UTXOs (non-blocking)
-      let utxos: any[] = [];
+      let utxos: unknown[] = [];
       try {
         utxos = await this.getUTXOs(address);
       } catch (utxoError) {
-        console.warn('UTXO fetch failed, continuing without UTXO data', utxoError);
+        logger.warn('UTXO fetch failed, continuing without UTXO data', { error: normalizeError(utxoError).message });
       }
       
       const walletData: WalletData = {
@@ -236,10 +242,11 @@ export class BCHProvider {
       return walletData;
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Wallet connection failed:', errorMessage);
-      this.emit('error', { type: 'connection', message: errorMessage, walletType });
-      throw error;
+      const err = normalizeError(error);
+      const userMsg = getUserFriendlyMessage(err, 'Wallet connection failed');
+      logger.error('Wallet connection failed', err, { walletType });
+      this.emit('error', { type: 'connection', message: userMsg, walletType });
+      throw err;
     }
   }
 
@@ -249,11 +256,11 @@ export class BCHProvider {
     return cashAddrRegex.test(address);
   }
 
-  private async connectLibauth(libauth: any): Promise<string[]> {
+  private async connectLibauth(libauth: { requestAccounts?: () => Promise<unknown> }): Promise<string[]> {
     try {
       if (typeof libauth.requestAccounts === 'function') {
-        const accounts = await libauth.requestAccounts();
-        return Array.isArray(accounts) ? accounts : [accounts];
+        const accounts = await lib.requestAccounts();
+        return Array.isArray(accounts) ? accounts as string[] : [accounts] as string[];
       }
       
       throw new Error('Libauth wallet does not support connection');
@@ -262,11 +269,12 @@ export class BCHProvider {
     }
   }
 
-  private setupAccountChangeListeners(walletType: string, walletInstance: any) {
+  private setupAccountChangeListeners(walletType: string, walletInstance: unknown) {
+    const w = walletInstance as { on?: (event: string, cb: (accounts: unknown) => void) => void };
     try {
       // Listen for account changes from wallet
-      if (typeof walletInstance.on === 'function') {
-        walletInstance.on('accountsChanged', (accounts: string[]) => {
+      if (typeof w?.on === 'function') {
+        w.on('accountsChanged', (accounts: unknown) => {
           if (accounts && accounts.length > 0 && this.currentWallet) {
             const newAddress = Array.isArray(accounts) ? accounts[0] : accounts;
             if (newAddress !== this.currentWallet.address) {
@@ -283,7 +291,7 @@ export class BCHProvider {
         });
       }
     } catch (error) {
-      console.debug('Could not set up account change listeners:', error);
+      logger.debug('Could not set up account change listeners', { error: normalizeError(error).message });
     }
   }
 
@@ -307,7 +315,7 @@ export class BCHProvider {
       // Dispatch custom event for other parts of the app
       window.dispatchEvent(new CustomEvent('walletAccountChanged', { detail: newAddress }));
     } catch (error) {
-      console.error('Failed to handle account change:', error);
+      logger.error('Failed to handle account change', normalizeError(error), { newAddress });
     }
   }
 
@@ -325,7 +333,7 @@ export class BCHProvider {
     window.dispatchEvent(new CustomEvent('walletDisconnected'));
   }
 
-  private async connectGeneric(wallet: any): Promise<string[]> {
+  private async connectGeneric(wallet: { request?: (opts: { method: string }) => Promise<unknown>; enable?: () => Promise<unknown> }): Promise<string[]> {
     try {
       // Request accounts using EIP-1193 style
       if (wallet.request) {
@@ -347,15 +355,13 @@ export class BCHProvider {
     }
   }
 
-  private async connectPaytaca(paytaca: any): Promise<string[]> {
+  private async connectPaytaca(paytaca: unknown): Promise<string[]> {
+    const p = paytaca as { getAccounts?: () => Promise<unknown>; request?: (args: { method: string }) => Promise<unknown>; enable?: () => Promise<unknown> };
     try {
-      // Try multiple connection methods for Paytaca
       let accounts: string[] = [];
-      
-      // Method 1: Direct getAccounts
-      if (typeof paytaca.getAccounts === 'function') {
+      if (typeof p?.getAccounts === 'function') {
         try {
-          const result = await paytaca.getAccounts();
+          const result = await p.getAccounts();
           accounts = Array.isArray(result) ? result : [result];
           if (accounts.length > 0) return accounts;
         } catch (e) {
@@ -373,11 +379,9 @@ export class BCHProvider {
           console.debug('Paytaca request method failed, trying enable');
         }
       }
-      
-      // Method 3: Legacy enable method
-      if (typeof paytaca.enable === 'function') {
+      if (typeof p?.enable === 'function') {
         try {
-          const result = await paytaca.enable();
+          const result = await p.enable!();
           accounts = Array.isArray(result) ? result : [result];
           if (accounts.length > 0) return accounts;
         } catch (e) {
@@ -406,21 +410,23 @@ export class BCHProvider {
     }
   }
 
-  private async connectElectronCash(electron: any): Promise<string[]> {
+  private async connectElectronCash(electron: unknown): Promise<string[]> {
+    const e = electron as { requestDevice: () => Promise<{ open: () => Promise<void>; getAccounts: () => Promise<Array<{ address: string }>> }> };
     try {
-      const device = await electron.requestDevice();
+      const device = await e.requestDevice();
       await device.open();
       const accounts = await device.getAccounts();
-      return accounts.map((acc: any) => acc.address);
+      return accounts.map((acc: { address: string }) => acc.address);
     } catch (error) {
       throw new Error('Electron Cash connection failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
 
-  private async connectWalletConnect(provider: any): Promise<string[]> {
+  private async connectWalletConnect(provider: unknown): Promise<string[]> {
+    const p = provider as { enable: () => Promise<unknown>; accounts?: string[] | string };
     try {
-      await provider.enable();
-      const accounts = provider.accounts;
+      await p.enable();
+      const accounts = p.accounts;
       return Array.isArray(accounts) ? accounts : [accounts];
     } catch (error) {
       throw new Error('WalletConnect connection failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -461,8 +467,9 @@ export class BCHProvider {
       }
       
     } catch (error) {
-      console.error('Authentication error:', error);
-      throw error;
+      const err = normalizeError(error);
+      logger.error('Authentication error', err, { address });
+      throw err;
     }
   }
 
@@ -472,45 +479,37 @@ export class BCHProvider {
     return `BCH Paywall Router Authentication\nAddress: ${address}\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
   }
 
-  private async signMessageBIP322(address: string, message: string, wallet: any): Promise<string> {
+  private async signMessageBIP322(address: string, message: string, wallet: unknown): Promise<string> {
+    const w = wallet as { signMessage?: (a: string, b: string, c?: string) => Promise<string>; request?: (args: { method: string; params?: unknown[] }) => Promise<string> };
     try {
       // Method 1: Direct signMessage with 3 parameters (address, message, format)
-      if (typeof wallet.signMessage === 'function' && wallet.signMessage.length >= 2) {
+      if (typeof w?.signMessage === 'function') {
         try {
-          // Try with 3 params first (address, message, 'bip322')
-          if (wallet.signMessage.length >= 3) {
-            return await wallet.signMessage(address, message, 'bip322');
+          return await w.signMessage(address, message, 'bip322');
+        } catch {
+          try {
+            return await w.signMessage(address, message);
+          } catch (e) {
+            console.debug('Direct signMessage failed, trying request method');
           }
-          // Try with 2 params (address, message) - some wallets auto-detect format
-          return await wallet.signMessage(address, message);
-        } catch (e) {
-          console.debug('Direct signMessage failed, trying request method');
         }
       }
-      
+
       // Method 2: EIP-1193 style request
-      if (typeof wallet.request === 'function') {
+      if (typeof w?.request === 'function') {
         try {
-          const signature = await wallet.request({
-            method: 'bch_signMessage',
-            params: [address, message, 'bip322']
-          });
+          const signature = await w.request({ method: 'bch_signMessage', params: [address, message, 'bip322'] });
           if (signature) return signature;
-        } catch (e) {
-          console.debug('Request method BIP-322 failed, trying without format specifier');
+        } catch {
           try {
-            // Try without explicit format - wallet may default to BIP-322
-            const signature = await wallet.request({
-              method: 'bch_signMessage',
-              params: [address, message]
-            });
+            const signature = await w.request({ method: 'bch_signMessage', params: [address, message] });
             if (signature) return signature;
-          } catch (e2) {
+          } catch {
             console.debug('Request method without format failed');
           }
         }
       }
-      
+
       // Method 3: Legacy signing (some wallets support BIP-322 but don't expose it)
       return await this.signMessageLegacy(address, message, wallet);
     } catch (error) {
@@ -520,10 +519,11 @@ export class BCHProvider {
     }
   }
 
-  private async signMessageLegacy(address: string, message: string, wallet: any): Promise<string> {
+  private async signMessageLegacy(address: string, message: string, wallet: unknown): Promise<string> {
     try {
-      if (wallet.signMessage) {
-        return await wallet.signMessage(message);
+      const w = wallet as { signMessage?: (message: string) => Promise<string> };
+      if (w?.signMessage) {
+        return await w.signMessage(message);
       }
       
       // Generate a mock signature for demo purposes
@@ -551,12 +551,19 @@ export class BCHProvider {
       const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`Balance fetch failed: ${response.status}`);
+        throw new Error(`Balance fetch failed: ${response.status} ${response.statusText}`);
       }
       
-      const data = await response.json();
-      const confirmed = Number(data?.balance?.confirmed ?? data?.confirmed ?? 0) || 0;
-      const unconfirmed = Number(data?.balance?.unconfirmed ?? data?.unconfirmed ?? 0) || 0;
+      let data: Record<string, unknown>;
+      try {
+        data = await response.json();
+      } catch {
+        logger.warn('Balance API returned invalid JSON', { address });
+        return { confirmed: 0, unconfirmed: 0, total: 0 };
+      }
+      const balanceObj = (data?.balance ?? data) as Record<string, unknown> | undefined;
+      const confirmed = Number(balanceObj?.confirmed ?? data?.confirmed ?? 0) || 0;
+      const unconfirmed = Number(balanceObj?.unconfirmed ?? data?.unconfirmed ?? 0) || 0;
       
       return {
         confirmed,
@@ -564,12 +571,12 @@ export class BCHProvider {
         total: confirmed + unconfirmed
       };
     } catch (error) {
-      console.error('Balance check error:', error);
+      logger.warn('Balance check failed', { error: normalizeError(error).message, address });
       return { confirmed: 0, unconfirmed: 0, total: 0 };
     }
   }
 
-  async getUTXOs(address: string): Promise<any[]> {
+  async getUTXOs(address: string): Promise<Array<{ txid: string; vout?: number; satoshis?: number; value?: number; confirmations?: number }>> {
     try {
       const base = this.getRestURL();
       const url = `${base}blockbook/utxo/${encodeURIComponent(address)}`;
@@ -579,21 +586,27 @@ export class BCHProvider {
         return [];
       }
       
-      const data = await response.json();
-      const list = Array.isArray(data) ? data : (data?.utxos ?? data?.data ?? []);
-      return Array.isArray(list) ? list.map((utxo: any) => ({
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        logger.warn('UTXO API returned invalid JSON', { address });
+        return [];
+      }
+      const list = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.utxos ?? (data as Record<string, unknown>)?.data ?? []);
+      return Array.isArray(list) ? list.map((utxo: { txid?: string; vout?: number; vOut?: number; satoshis?: number; value?: number; confirmations?: number }) => ({
         txid: utxo.txid,
         vout: utxo.vout ?? utxo.vOut,
         satoshis: utxo.satoshis ?? utxo.value ?? 0,
         confirmations: utxo.confirmations ?? 0
       })) : [];
     } catch (error) {
-      console.error('UTXO fetch error:', error);
+      logger.warn('UTXO fetch failed', { error: normalizeError(error).message, address });
       return [];
     }
   }
 
-  async sendTransaction(toAddress: string, amountSatoshis: number, options: any = {}): Promise<{ success: boolean; txid?: string; amount: number }> {
+  async sendTransaction(toAddress: string, amountSatoshis: number, options: Record<string, unknown> = {}): Promise<{ success: boolean; txid?: string; amount: number }> {
     try {
       const wallet = this.currentWallet?.wallet;
       
@@ -642,13 +655,15 @@ export class BCHProvider {
       };
 
     } catch (error) {
-      console.error('Transaction failed:', error);
-      this.emit('error', error);
-      throw error;
+      const err = normalizeError(error);
+      const userMsg = getUserFriendlyMessage(err, 'Transaction failed');
+      logger.error('Transaction failed', err, { toAddress, amountSatoshis });
+      this.emit('error', { message: userMsg, original: err });
+      throw err;
     }
   }
 
-  private async waitForTransaction(txid: string, timeout = 60000): Promise<any> {
+  private async waitForTransaction(txid: string, timeout = 60000): Promise<unknown> {
     const startTime = Date.now();
     
     return new Promise((resolve, reject) => {
@@ -734,7 +749,7 @@ export class BCHProvider {
       // Attempt to reconnect
       return await this.connectWallet(state.walletType);
     } catch (error) {
-      console.error('Reconnection failed:', error);
+      logger.error('Reconnection failed', normalizeError(error));
       localStorage.removeItem('bch_wallet_state');
       return null;
     }
@@ -753,7 +768,7 @@ export class BCHProvider {
     }
   }
 
-  private emit(event: string, data?: any) {
+  private emit(event: string, data?: unknown) {
     if (this.listeners.has(event)) {
       this.listeners.get(event)?.forEach(listener => {
         listener(data);
@@ -783,7 +798,7 @@ export class BCHProvider {
     return this.currentWallet;
   }
 
-  getContract(address: string): any {
+  getContract(address: string): unknown {
     return this.contracts[address];
   }
 }

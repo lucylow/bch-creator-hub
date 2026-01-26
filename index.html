@@ -1,11 +1,26 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        var k = 'theme';
+        var s = localStorage.getItem(k);
+        var m = window.matchMedia('(prefers-color-scheme: dark)');
+        function apply(dark) { d.classList.toggle('dark', dark); }
+        function set() {
+          if (s === 'dark' || s === 'light') apply(s === 'dark');
+          else apply(m.matches);
+        }
+        set();
+        m.addEventListener && m.addEventListener('change', function () { if (!localStorage.getItem(k)) set(); });
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
     <title>BCH Paywall Router | One Address for All Creator Payments</title>
     <meta name="description" content="Unlock direct monetization with Bitcoin Cash. One address to collect payments across all platforms. Join the creator economy revolution." />
     <meta name="author" content="BCH Paywall Router" />

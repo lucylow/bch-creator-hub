@@ -1,8 +1,11 @@
 // Hook for payment operations
 import { useState, useCallback } from 'react';
 import { useWallet } from '@/contexts/WalletContext';
+import { useBCHNetwork } from './useBCHNetwork';
 import { API } from '../api/client';
 import { toast } from 'sonner';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
+import { logger } from '@/utils/logger';
 
 const defaultTxSize = { inputs: 1, outputs: 2, overhead: 10 };
 const bytesPerInput = 148;
@@ -11,9 +14,12 @@ const defaultFeePerByte = 1.0;
 
 export const usePayments = () => {
   const { isConnected, address, sendPayment } = useWallet();
+  const { getTxExplorerUrl } = useBCHNetwork();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lastTxId, setLastTxId] = useState<string | null>(null);
+  const clearLastTxId = useCallback(() => setLastTxId(null), []);
 
-  const sendTip = useCallback(async (creatorAddress: string, amountSatoshis: number, metadata: Record<string, any> = {}) => {
+  const sendTip = useCallback(async (creatorAddress: string, amountSatoshis: number, metadata: Record<string, unknown> = {}) => {
     if (!isConnected) {
       throw new Error('Wallet not connected');
     }
@@ -26,11 +32,13 @@ export const usePayments = () => {
         metadata,
         timestamp: Date.now()
       }));
-
+      if (result?.txid) setLastTxId(result.txid);
       return result;
       
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Tip failed');
+      const msg = getUserFriendlyMessage(error, 'Tip failed');
+      logger.error('Tip failed', error instanceof Error ? error : new Error(String(error)), { creatorAddress, amountSatoshis });
+      toast.error(msg);
       throw error;
     } finally {
       setIsProcessing(false);
@@ -67,11 +75,13 @@ export const usePayments = () => {
         txid: result.txid,
         amountSatoshis
       });
-
+      if (result?.txid) setLastTxId(result.txid);
       return result;
       
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Content unlock failed');
+      const msg = getUserFriendlyMessage(error, 'Content unlock failed');
+      logger.error('Content unlock failed', error instanceof Error ? error : new Error(String(error)), { paymentIntentId });
+      toast.error(msg);
       throw error;
     } finally {
       setIsProcessing(false);
@@ -91,11 +101,13 @@ export const usePayments = () => {
         periods,
         timestamp: Date.now()
       }));
-
+      if (result?.txid) setLastTxId(result.txid);
       return result;
       
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Subscription purchase failed');
+      const msg = getUserFriendlyMessage(error, 'Subscription purchase failed');
+      logger.error('Subscription purchase failed', error instanceof Error ? error : new Error(String(error)), { subscriptionContractAddress, amountSatoshis });
+      toast.error(msg);
       throw error;
     } finally {
       setIsProcessing(false);
@@ -132,8 +144,8 @@ export const usePayments = () => {
             percentage: ((d.sats / safeAmount) * 100).toFixed(2),
           };
         }
-      } catch {
-        // ignore; caller falls back to local estimate
+      } catch (error) {
+        logger.debug('Fee estimate from server failed, using local estimate', { error: error instanceof Error ? error.message : String(error) });
       }
       return null;
     },
@@ -147,6 +159,9 @@ export const usePayments = () => {
     estimateFee,
     estimateFeeFromServer,
     isProcessing,
+    lastTxId,
+    getTxExplorerUrl,
+    clearLastTxId,
   };
 };
 

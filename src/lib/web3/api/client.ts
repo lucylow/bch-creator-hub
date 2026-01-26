@@ -50,13 +50,14 @@ class ApiClient {
     }
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, data?: Record<string, unknown>): Promise<ApiResponse<T>> {
     // Special handling for /auth/login - redirect to /auth/wallet using unified service
-    if (endpoint === '/auth/login' && data?.address && data?.signature && data?.message) {
+    const auth = data as { address?: string; signature?: string; message?: string } | undefined;
+    if (endpoint === '/auth/login' && auth?.address && auth?.signature && auth?.message) {
       return apiService.authenticateWallet({
-        address: data.address,
-        signature: data.signature,
-        message: data.message,
+        address: auth.address,
+        signature: auth.signature,
+        message: auth.message,
       }) as Promise<ApiResponse<T>>;
     }
     
@@ -97,7 +98,7 @@ class ApiClient {
     }
   }
 
-  async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+  async put<T>(endpoint: string, data?: Record<string, unknown>): Promise<ApiResponse<T>> {
     const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
     const token = localStorage.getItem('auth_token');
@@ -118,11 +119,14 @@ class ApiClient {
         throw new Error('Authentication expired');
       }
 
-      const responseData = await response.json();
-      
-      if (responseData.token) {
+      const contentType = response.headers.get('content-type') ?? '';
+      const responseData = contentType.includes('application/json')
+        ? await response.json().catch(() => ({ success: false, error: `HTTP ${response.status}: ${response.statusText}` }))
+        : { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
+
+      if (responseData?.token) {
         localStorage.setItem('auth_token', responseData.token);
-      } else if (responseData.data?.token) {
+      } else if (responseData?.data?.token) {
         localStorage.setItem('auth_token', responseData.data.token);
       }
 
@@ -130,7 +134,7 @@ class ApiClient {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'API request failed',
+        error: getUserFriendlyMessage(error, 'API request failed'),
       };
     }
   }

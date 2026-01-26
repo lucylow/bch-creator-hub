@@ -23,11 +23,39 @@ export const useCreator = () => {
   return context;
 };
 
+// Backend creator shape (snake_case or camelCase)
+type BackendCreatorShape = {
+  creator_id?: string;
+  creatorId?: string;
+  id?: string;
+  wallet_address?: string;
+  address?: string;
+  display_name?: string;
+  displayName?: string;
+  email?: string;
+  avatar_url?: string;
+  avatarUrl?: string;
+  bio?: string;
+  website?: string;
+  twitter_handle?: string;
+  twitterHandle?: string;
+  contract_address?: string;
+  contractAddress?: string;
+  fee_basis_points?: number;
+  feeBasisPoints?: number;
+  is_verified?: boolean;
+  isVerified?: boolean;
+  balance?: number;
+  stats?: unknown;
+  created_at?: string;
+  createdAt?: string;
+  last_login?: string;
+  lastLogin?: string;
+};
+
 // Helper to transform backend creator object (snake_case) to frontend format (camelCase)
-const transformCreator = (backendCreator: any): Creator | null => {
+const transformCreator = (backendCreator: BackendCreatorShape | null): Creator | null => {
   if (!backendCreator) return null;
-  
-  // Handle both snake_case and camelCase formats
   return {
     id: backendCreator.creator_id || backendCreator.id || '',
     creatorId: backendCreator.creator_id || backendCreator.creatorId || '',
@@ -35,12 +63,12 @@ const transformCreator = (backendCreator: any): Creator | null => {
     displayName: backendCreator.display_name || backendCreator.displayName,
     email: backendCreator.email,
     avatarUrl: backendCreator.avatar_url || backendCreator.avatarUrl,
-    bio: backendCreator.bio || '',
+    bio: backendCreator.bio ?? '',
     website: backendCreator.website,
     twitterHandle: backendCreator.twitter_handle || backendCreator.twitterHandle,
     contractAddress: backendCreator.contract_address || backendCreator.contractAddress,
-    feeBasisPoints: backendCreator.fee_basis_points || backendCreator.feeBasisPoints || 100,
-    isVerified: backendCreator.is_verified || backendCreator.isVerified || false,
+    feeBasisPoints: backendCreator.fee_basis_points ?? backendCreator.feeBasisPoints ?? 100,
+    isVerified: backendCreator.is_verified ?? backendCreator.isVerified ?? false,
     balance: backendCreator.balance,
     stats: backendCreator.stats,
     createdAt: backendCreator.created_at || backendCreator.createdAt || new Date().toISOString(),
@@ -92,7 +120,7 @@ export const CreatorProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Map camelCase to backend format
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       if (data.displayName !== undefined) updateData.displayName = data.displayName;
       if (data.email !== undefined) updateData.email = data.email;
       if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;

@@ -30,26 +30,34 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 font-heading text-xl font-semibold mb-4">
+            <Link
+              to="/"
+              className="flex items-center gap-2 font-heading text-xl font-semibold mb-4 text-foreground hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg w-fit"
+              aria-label="BCH Paywall Router – Home"
+            >
               <Route className="w-6 h-6 text-primary flex-shrink-0" />
               BCH Paywall Router
-            </div>
+            </Link>
             <p className="text-muted-foreground mb-6">
               Building the financial infrastructure for the decentralized creator economy. Powered by Bitcoin Cash.
             </p>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {[
-                { icon: Twitter, href: '#' },
-                { icon: Github, href: '#' },
+                { icon: Twitter, href: '#', label: 'Twitter' },
+                { icon: Github, href: '#', label: 'GitHub' },
               ].map((social, i) => (
                 <a
                   key={i}
                   href={social.href}
-                  className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.label}
+                  className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   <social.icon className="w-5 h-5" />
                 </a>
               ))}
+              <ThemeToggle variant="outline" size="sm" className="rounded-full w-10 h-10 p-0" />
             </div>
           </div>
 
@@ -59,7 +67,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} className="text-muted-foreground hover:text-primary hover:pl-1 transition-all">
+                  <a href={link.href} className="text-muted-foreground hover:text-primary hover:pl-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:rounded rounded">
                     {link.label}
                   </a>
                 </li>
@@ -69,11 +77,11 @@ const Footer = () => {
 
           {/* Company Links */}
           <div>
-            <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-3">
+            <h4 id="footer-company" className="font-heading font-semibold mb-4 text-foreground">Company</h4>
+            <ul className="space-y-3" aria-labelledby="footer-company">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} className="text-muted-foreground hover:text-primary hover:pl-1 transition-all">
+                  <a href={link.href} className="text-muted-foreground hover:text-primary hover:pl-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded inline-block">
                     {link.label}
                   </a>
                 </li>
@@ -83,11 +91,11 @@ const Footer = () => {
 
           {/* Legal Links */}
           <div>
-            <h4 className="font-heading font-semibold mb-4">Legal</h4>
-            <ul className="space-y-3">
+            <h4 id="footer-legal" className="font-heading font-semibold mb-4 text-foreground">Legal</h4>
+            <ul className="space-y-3" aria-labelledby="footer-legal">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} className="text-muted-foreground hover:text-primary hover:pl-1 transition-all">
+                  <a href={link.href} className="text-muted-foreground hover:text-primary hover:pl-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded inline-block">
                     {link.label}
                   </a>
                 </li>

@@ -124,31 +124,32 @@ const UnifiedPaymentInterface: React.FC<UnifiedPaymentInterfaceProps> = ({
       {/* Single QR + address block */}
       <div
         className={cn(
-          'rounded-xl border border-border bg-muted/30 overflow-hidden',
+          'rounded-2xl border border-border bg-muted/30 overflow-hidden',
           compact ? 'p-4' : 'p-6'
         )}
       >
         <div className="flex flex-col items-center">
-          <div className="flex items-center gap-2 text-muted-foreground mb-2">
-            <QrCode className="w-4 h-4" />
+          <div className="flex items-center gap-2 text-muted-foreground mb-3">
+            <QrCode className="w-4 h-4 shrink-0" aria-hidden />
             <span className="text-sm font-medium">Scan to pay — any BCH wallet</span>
           </div>
           <QRCodeDisplay
             value={qrValue}
-            title=""
+            title="Payment QR"
             description=""
-            scanHint=""
+            scanHint="Scan with any BCH wallet to pay"
             size={qrSize}
             level="H"
             showDownload={true}
             showCopy={false}
             showShare={false}
             showTitleDescription={false}
-            themed={false}
+            themed={true}
             animate={true}
-            className="mb-4"
+            showScanFrame={true}
+            className="mb-3"
           />
-          <p className="text-xs text-muted-foreground text-center mb-3 max-w-[min(100%,280px)]">
+          <p className="text-xs text-muted-foreground text-center mb-3 max-w-[min(100%,300px)]">
             Same code for tips, subscriptions, and unlocks. Amount can be added when you pay.
           </p>
 

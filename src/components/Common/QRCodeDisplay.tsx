@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import QRCode from 'react-qr-code';
-import { Download, Copy, Share2, Check, FileImage, FileCode } from 'lucide-react';
+import { Download, Copy, Share2, Check, FileImage, FileCode, Printer, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -16,6 +16,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 /** Slugify a string for use in filenames */
 function slugify(text: string): string {
@@ -27,6 +32,9 @@ function slugify(text: string): string {
     .trim()
     .slice(0, 32) || 'qrcode';
 }
+
+/** Quiet zone in pixels (ISO recommends 4 modules; we use fixed padding for consistency) */
+const QUIET_ZONE = 16;
 
 export interface QRCodeDisplayProps {
   value: string;
@@ -48,10 +56,14 @@ export interface QRCodeDisplayProps {
   downloadFilename?: string;
   /** Use theme-aware container (card/muted) while keeping QR high-contrast for scanning */
   themed?: boolean;
-  /** Subtle pulse on the QR container to draw attention */
+  /** Subtle scale-in on the QR container to draw attention */
   animate?: boolean;
   /** When false, title/description are not rendered (e.g. when used inside a modal that shows them in the header) */
   showTitleDescription?: boolean;
+  /** Show corner “scan frame” accents around the QR for better scannability affordance */
+  showScanFrame?: boolean;
+  /** Show "Print" button (useful in modal for physical handouts) */
+  showPrint?: boolean;
 }
 
 const DEFAULT_SCAN_HINT = 'Point your BCH wallet at this code to pay';
@@ -73,6 +85,9 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   downloadFilename,
   themed = true,
   animate = true,
+  showTitleDescription = true,
+  showScanFrame = true,
+  showPrint = false,
 }) => {
   const qrRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -89,7 +104,7 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       }
       const clonedSvg = svg.cloneNode(true) as SVGElement;
       const canvas = document.createElement('canvas');
-      const padding = 20;
+      const padding = QUIET_ZONE;
       canvas.width = size + padding * 2;
       canvas.height = size + padding * 2;
       const ctx = canvas.getContext('2d');
@@ -203,6 +218,10 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
     }
   };
 
+  const printQRCode = () => {
+    window.print();
+  };
+
   const shareQRCode = async () => {
     if (navigator.share) {
       try {
@@ -238,22 +257,37 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   };
 
   const containerClasses = themed
-    ? 'rounded-xl border border-border bg-card p-4 shadow-sm'
-    : 'rounded-xl bg-white p-4 border border-border';
+    ? 'rounded-2xl border border-border bg-card shadow-sm p-4'
+    : 'rounded-2xl bg-white border border-border shadow-sm p-4';
 
   return (
-    <div className={`flex flex-col items-center ${className}`}>
+    <div className={`flex flex-col items-center ${className}`} role="img" aria-label={title}>
+      {/* QR container: quiet zone (p-4) + optional scan-frame corners */}
       <div
-        className={`relative mb-4 ${containerClasses} ${animate ? 'animate-fade-in' : ''}`}
+        className={`relative mb-4 ${containerClasses} ${animate ? 'animate-scale-in' : ''}`}
         ref={qrRef}
       >
-        {animate && (
-          <span
-            className="absolute inset-0 rounded-xl animate-pulse pointer-events-none opacity-[0.03] bg-primary"
-            aria-hidden
-          />
+        {showScanFrame && (
+          <>
+            <span
+              className="absolute top-3 left-3 w-5 h-5 border-l-2 border-t-2 border-primary/50 rounded-tl"
+              aria-hidden
+            />
+            <span
+              className="absolute top-3 right-3 w-5 h-5 border-r-2 border-t-2 border-primary/50 rounded-tr"
+              aria-hidden
+            />
+            <span
+              className="absolute bottom-3 left-3 w-5 h-5 border-l-2 border-b-2 border-primary/50 rounded-bl"
+              aria-hidden
+            />
+            <span
+              className="absolute bottom-3 right-3 w-5 h-5 border-r-2 border-b-2 border-primary/50 rounded-br"
+              aria-hidden
+            />
+          </>
         )}
-        <div className="relative z-0">
+        <div className="relative z-0 flex items-center justify-center">
           <QRCode
             value={value}
             size={size}
@@ -265,9 +299,12 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       </div>
 
       {scanHint && (
-        <p className="text-xs text-muted-foreground text-center mb-3 max-w-[min(100%,280px)]">
-          {scanHint}
-        </p>
+        <div className="flex items-center gap-1.5 justify-center mb-3 text-muted-foreground">
+          <ScanLine className="w-3.5 h-3.5 shrink-0 opacity-70" aria-hidden />
+          <p className="text-xs text-center max-w-[min(100%,300px)]">
+            {scanHint}
+          </p>
+        </div>
       )}
 
       {showTitleDescription && (title || description) && (
@@ -279,78 +316,109 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
         </div>
       )}
 
-      {(showDownload || showCopy || showShare || showCopyImage) && (
-        <div className="flex flex-wrap gap-2 justify-center">
+      {(showDownload || showCopy || showShare || showCopyImage || showPrint) && (
+        <div className="flex flex-wrap gap-2 justify-center" role="group" aria-label="QR code actions">
+          {showCopy && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={copyToClipboard}
+                  className="gap-2 min-w-[4.5rem]"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy link
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Copy payment link or address</TooltipContent>
+            </Tooltip>
+          )}
           {showDownload && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Download className="w-4 h-4" />
-                  Download
-                </Button>
-              </DropdownMenuTrigger>
+              <Tooltip>
+                <DropdownMenuTrigger asChild>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Download className="w-4 h-4" />
+                      Download
+                    </Button>
+                  </TooltipTrigger>
+                </DropdownMenuTrigger>
+                <TooltipContent side="top">Save as PNG or SVG</TooltipContent>
+              </Tooltip>
               <DropdownMenuContent align="center">
                 <DropdownMenuItem onClick={downloadPNG} className="gap-2">
                   <FileImage className="w-4 h-4" />
-                  PNG (best for screens)
+                  PNG (screens &amp; social)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={downloadSVG} className="gap-2">
                   <FileCode className="w-4 h-4" />
-                  SVG (best for print)
+                  SVG (print &amp; scale)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {showCopy && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={copyToClipboard}
-              className="gap-2"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  Copy link
-                </>
-              )}
-            </Button>
-          )}
           {showCopyImage && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={copyImageToClipboard}
-              className="gap-2"
-            >
-              {copiedImage ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Image copied
-                </>
-              ) : (
-                <>
-                  <FileImage className="w-4 h-4" />
-                  Copy image
-                </>
-              )}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyImageToClipboard}
+                  className="gap-2"
+                >
+                  {copiedImage ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Image copied
+                    </>
+                  ) : (
+                    <>
+                      <FileImage className="w-4 h-4" />
+                      Copy image
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Copy QR as image to paste elsewhere</TooltipContent>
+            </Tooltip>
           )}
           {showShare && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={shareQRCode}
-              className="gap-2"
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={shareQRCode}
+                  className="gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Share via your device</TooltipContent>
+            </Tooltip>
+          )}
+          {showPrint && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={printQRCode} className="gap-2">
+                  <Printer className="w-4 h-4" />
+                  Print
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Print this QR for physical handouts</TooltipContent>
+            </Tooltip>
           )}
         </div>
       )}
@@ -370,12 +438,13 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({
   title = 'Scan QR Code',
   description = 'Use any BCH wallet to scan this code',
   scanHint = DEFAULT_SCAN_HINT,
-  size = 256,
+  size = 280,
   level = 'H',
   showDownload = true,
   showCopy = true,
   showShare = true,
   showCopyImage = true,
+  showPrint = true,
   downloadFilename,
   bgColor = '#FFFFFF',
   fgColor = '#000000',
@@ -385,32 +454,35 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md overflow-y-auto max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+      <DialogContent className="sm:max-w-[420px] overflow-y-auto max-h-[90vh] print:block print:max-h-none print:shadow-none" id="qr-code-modal">
+        <DialogHeader className="text-center sm:text-left">
+          <DialogTitle className="text-xl">{title}</DialogTitle>
           {description && (
-            <DialogDescription>{description}</DialogDescription>
+            <DialogDescription className="mt-1">{description}</DialogDescription>
           )}
         </DialogHeader>
-        <QRCodeDisplay
-          value={value}
-          title={title}
-          description={description}
-          scanHint={scanHint}
-          size={size}
-          level={level}
-          showDownload={showDownload}
-          showCopy={showCopy}
-          showShare={showShare}
-          showCopyImage={showCopyImage}
-          downloadFilename={downloadFilename ?? slugify(title)}
-          bgColor={bgColor}
-          fgColor={fgColor}
-          themed={themed}
-          animate={animate}
-          showTitleDescription={false}
-          {...rest}
-        />
+        <div className="flex flex-col items-center py-2">
+          <QRCodeDisplay
+            value={value}
+            title={title}
+            description={description}
+            scanHint={scanHint}
+            size={size}
+            level={level}
+            showDownload={showDownload}
+            showCopy={showCopy}
+            showShare={showShare}
+            showCopyImage={showCopyImage}
+            showPrint={showPrint}
+            downloadFilename={downloadFilename ?? slugify(title)}
+            bgColor={bgColor}
+            fgColor={fgColor}
+            themed={themed}
+            animate={animate}
+            showTitleDescription={false}
+            {...rest}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

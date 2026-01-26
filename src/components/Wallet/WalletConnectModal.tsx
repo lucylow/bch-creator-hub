@@ -1,13 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/contexts/WalletContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2, Shield, Smartphone, Monitor, HardDrive, QrCode } from 'lucide-react';
+import { X, ExternalLink, CheckCircle2, AlertCircle, Loader2, Shield, Smartphone, Monitor, HardDrive, QrCode, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { walletService } from '@/services/walletService';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Props = { onClose: () => void; open: boolean };
+
+/** Maps modal option id to the provider id used by connect(). null = install only. */
+const CONNECT_ID_MAP: Record<string, string | null> = {
+  demo: 'demo',
+  paytaca: 'paytaca',
+  'electron-cash': 'electron-cash',
+  bitcoincom: 'generic',
+  selene: null,
+  atomic: null,
+  trust: null,
+  ledger: null,
+  trezor: null,
+};
 
 interface WalletOption {
   id: string;
@@ -31,14 +44,14 @@ const walletOptions: WalletOption[] = [
     features: ['No setup required', 'Explore all features', 'Test transactions']
   },
   {
-    id: 'bitcoincom',
-    name: 'Bitcoin.com Wallet',
-    icon: '💚',
-    description: 'User-friendly mobile & desktop wallet',
+    id: 'paytaca',
+    name: 'Paytaca',
+    icon: '🦜',
+    description: 'BCH wallet with BIP-322 signing',
     type: 'mobile',
-    downloadUrl: 'https://wallet.bitcoin.com',
+    downloadUrl: 'https://paytaca.com',
     recommended: true,
-    features: ['Buy/sell/swap BCH', 'Beginner friendly', 'Multi-asset support']
+    features: ['BIP-322 support', 'CashTokens ready', 'Browser extension']
   },
   {
     id: 'electron-cash',
@@ -50,6 +63,15 @@ const walletOptions: WalletOption[] = [
     features: ['Advanced features', 'CashFusion privacy', 'Hardware wallet support']
   },
   {
+    id: 'bitcoincom',
+    name: 'Bitcoin.com Wallet',
+    icon: '💚',
+    description: 'User-friendly mobile & desktop wallet',
+    type: 'mobile',
+    downloadUrl: 'https://wallet.bitcoin.com',
+    features: ['Buy/sell/swap BCH', 'Beginner friendly', 'Multi-asset support']
+  },
+  {
     id: 'selene',
     name: 'Selene Wallet',
     icon: '🌙',
@@ -57,15 +79,6 @@ const walletOptions: WalletOption[] = [
     type: 'mobile',
     downloadUrl: 'https://selene.cash',
     features: ['Clean interface', 'Fast payments', 'QR support']
-  },
-  {
-    id: 'paytaca',
-    name: 'Paytaca',
-    icon: '🦜',
-    description: 'BCH wallet with BIP-322 signing',
-    type: 'mobile',
-    downloadUrl: 'https://paytaca.com',
-    features: ['BIP-322 support', 'CashTokens ready', 'Browser extension']
   },
   {
     id: 'atomic',
@@ -106,26 +119,38 @@ const walletOptions: WalletOption[] = [
 ];
 
 const WalletConnectModal: React.FC<Props> = ({ onClose, open }) => {
-  const { connect } = useWallet();
+  const { connect, availableWallets } = useWallet();
   const [connecting, setConnecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
 
+  // Clear error when modal opens
+  useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
+
+  const canConnect = (option: WalletOption): boolean => {
+    const connectId = CONNECT_ID_MAP[option.id];
+    if (connectId == null) return false;
+    return connectId === 'demo' || availableWallets.includes(connectId);
+  };
+
   const handleConnect = async (wallet: WalletOption) => {
-    if (wallet.type === 'hardware' || (wallet.type !== 'demo' && !wallet.id.includes('demo'))) {
-      // For external wallets, open download page
+    const connectId = CONNECT_ID_MAP[wallet.id];
+
+    if (connectId == null || !canConnect(wallet)) {
       if (wallet.downloadUrl) {
         window.open(wallet.downloadUrl, '_blank');
-        toast.info(`Install ${wallet.name} and connect via browser extension`);
+        toast.info(`Install ${wallet.name}, then refresh this page to connect`);
       }
       return;
     }
 
     setConnecting(wallet.id);
     setError(null);
-    
+
     try {
-      const result = await connect(wallet.id);
+      const result = await connect(connectId);
       if (result.success) {
         toast.success('Wallet connected successfully!');
         onClose();
@@ -140,8 +165,9 @@ const WalletConnectModal: React.FC<Props> = ({ onClose, open }) => {
   };
 
   const filterWallets = (type: string) => {
-    if (type === 'all') return walletOptions;
-    return walletOptions.filter(w => w.type === type);
+    const list = type === 'all' ? walletOptions : walletOptions.filter(w => w.type === type);
+    // Put connectable wallets first
+    return [...list].sort((a, b) => (canConnect(b) ? 1 : 0) - (canConnect(a) ? 1 : 0));
   };
 
   const typeIcons = {
@@ -257,15 +283,32 @@ const WalletConnectModal: React.FC<Props> = ({ onClose, open }) => {
                         )}
                       </div>
 
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        {canConnect(wallet) && (
+                          <span className="hidden sm:inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                            <Wifi className="w-3 h-3" />
+                            Ready
+                          </span>
+                        )}
                         {connecting === wallet.id ? (
                           <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                        ) : wallet.type === 'demo' ? (
+                        ) : canConnect(wallet) ? (
                           <Button size="sm" variant="default" className="bg-primary hover:bg-primary/90">
                             Connect
                           </Button>
                         ) : (
-                          <Button size="sm" variant="outline" className="gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (wallet.downloadUrl) {
+                                window.open(wallet.downloadUrl, '_blank');
+                                toast.info(`Install ${wallet.name}, then refresh to connect`);
+                              }
+                            }}
+                          >
                             <ExternalLink className="w-3 h-3" />
                             Get
                           </Button>
@@ -278,7 +321,12 @@ const WalletConnectModal: React.FC<Props> = ({ onClose, open }) => {
             </Tabs>
 
             {/* Security Info */}
-            <div className="p-4 bg-muted/30 border-t border-border/50">
+            <div className="p-4 bg-muted/30 border-t border-border/50 space-y-3">
+              {availableWallets.filter(w => w !== 'demo').length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No browser wallet detected. Use <strong>Demo Wallet</strong> to explore, or install Paytaca / a BCH extension and refresh.
+                </p>
+              )}
               <div className="flex items-start gap-3">
                 <Shield className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-muted-foreground">

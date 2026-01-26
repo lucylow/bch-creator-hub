@@ -86,7 +86,7 @@ const HeroSection = () => {
             </span>
           </motion.div>
 
-          <h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
+          <h1 id="hero-heading" className="font-heading text-4xl sm:text-5xl lg:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
             <motion.span
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -141,7 +141,7 @@ const HeroSection = () => {
             <Button
               onClick={() => scrollToSection('#waitlist')}
               size="lg"
-              className="bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold px-8 py-6 text-lg glow-effect shadow-lg hover:shadow-xl transition-all"
+              className="bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold px-8 py-6 text-lg glow-effect shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <Rocket className="w-5 h-5 mr-2" />
               Start for Free
@@ -151,10 +151,10 @@ const HeroSection = () => {
               onClick={() => scrollToSection('#demo')}
               variant="outline"
               size="lg"
-              className="border-2 border-border hover:border-primary hover:text-primary hover:bg-primary/10 px-8 py-6 text-lg bg-background/50 backdrop-blur-sm transition-all"
+              className="border-2 border-border hover:border-primary hover:text-primary hover:bg-primary/5 px-8 py-6 text-lg bg-background/50 backdrop-blur-sm transition-all"
             >
               <PlayCircle className="w-5 h-5 mr-2" />
-              Try Interactive Demo
+              See how it works
             </Button>
           </motion.div>
 
@@ -199,8 +199,12 @@ const HeroSection = () => {
         <motion.div
           animate={{ y: [0, 10, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="flex flex-col items-center gap-2 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          aria-label="Scroll to interactive demo"
+          className="flex flex-col items-center gap-2 cursor-pointer rounded-lg p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => scrollToSection('#demo')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('#demo'); } }}
         >
           <span className="text-xs text-muted-foreground">Scroll to explore</span>
           <ArrowDown className="w-5 h-5 text-muted-foreground" />

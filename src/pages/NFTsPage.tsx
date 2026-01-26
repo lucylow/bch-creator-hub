@@ -7,6 +7,8 @@ import { ArrowLeft, Home, BarChart2, Link2, Settings } from 'lucide-react';
 import MintForm from '@/components/NFT/MintForm';
 import BuyNFT from '@/components/NFT/BuyNFT';
 import NFTGallery from '@/components/NFT/NFTGallery';
+import CreateVoucher from '@/components/NFT/CreateVoucher';
+import VoucherDashboard from '@/components/NFT/VoucherDashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Breadcrumbs from '@/components/Common/Breadcrumbs';
 
@@ -66,10 +68,12 @@ export default function NFTsPage() {
       </div>
 
       <Tabs defaultValue="gallery" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5">
           <TabsTrigger value="gallery">Gallery</TabsTrigger>
           <TabsTrigger value="mint">Mint</TabsTrigger>
           <TabsTrigger value="buy">Buy</TabsTrigger>
+          <TabsTrigger value="create-voucher">Create Voucher</TabsTrigger>
+          <TabsTrigger value="vouchers">Vouchers</TabsTrigger>
         </TabsList>
 
         <TabsContent value="gallery" className="mt-6">
@@ -82,6 +86,14 @@ export default function NFTsPage() {
 
         <TabsContent value="buy" className="mt-6">
           <BuyNFT />
+        </TabsContent>
+
+        <TabsContent value="create-voucher" className="mt-6">
+          <CreateVoucher />
+        </TabsContent>
+
+        <TabsContent value="vouchers" className="mt-6">
+          <VoucherDashboard />
         </TabsContent>
       </Tabs>
     </div>

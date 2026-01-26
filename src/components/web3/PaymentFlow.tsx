@@ -2,23 +2,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { usePayments } from '@/lib/web3/hooks/usePayments';
 import { useWallet } from '@/contexts/WalletContext';
+import { useBCHNetwork } from '@/lib/web3/hooks/useBCHNetwork';
 import { Send, Lock, Calendar, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatBCH, formatUSD, generatePaymentURI, truncateAddress, getBlockExplorerUrl } from '@/lib/web3/utils/bch';
+import { getUserFriendlyMessage } from '@/utils/errorUtils';
+import { formatBCH, formatUSD, generatePaymentURI, truncateAddress } from '@/lib/web3/utils/bch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { QRCodeModal } from '@/components/Common/QRCodeDisplay';
 
+export interface PaymentResult {
+  txid?: string;
+  success?: boolean;
+  error?: string;
+}
+
 interface PaymentFlowProps {
   recipientAddress: string;
   amount?: string;
   paymentType?: 'tip' | 'content_unlock' | 'subscription' | 'donation';
-  metadata?: Record<string, any>;
-  onComplete?: (result: any) => void;
+  metadata?: Record<string, unknown>;
+  onComplete?: (result: PaymentResult) => void;
 }
-
-const BCH_NETWORK = import.meta.env.VITE_BCH_NETWORK || 'mainnet';
 
 const PaymentFlow: React.FC<PaymentFlowProps> = ({
   recipientAddress,
@@ -28,6 +34,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
   onComplete
 }) => {
   const { isConnected, address, balance } = useWallet();
+  const { getTxExplorerUrl } = useBCHNetwork();
   const { sendTip, unlockContent, purchaseSubscription, estimateFee, estimateFeeFromServer, isProcessing } = usePayments();
   
   const [amount, setAmount] = useState(initialAmount || '');
@@ -50,10 +57,14 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       return;
     }
     let cancelled = false;
-    estimateFeeFromServer(amountSats).then((fee) => {
-      if (!cancelled && fee) setServerFee(fee);
-      else if (!cancelled) setServerFee(null);
-    });
+    estimateFeeFromServer(amountSats)
+      .then((fee) => {
+        if (!cancelled && fee) setServerFee(fee);
+        else if (!cancelled) setServerFee(null);
+      })
+      .catch(() => {
+        if (!cancelled) setServerFee(null);
+      });
     return () => { cancelled = true; };
   }, [amountSats, estimateFeeFromServer]);
 
@@ -78,8 +89,8 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       setStep(2);
 
     } catch (error) {
-      console.error('Payment preparation error:', error);
-      toast.error('Payment preparation failed');
+      const msg = getUserFriendlyMessage(error, 'Payment preparation failed');
+      toast.error(msg);
     }
   };
 
@@ -116,8 +127,8 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
       }
       
     } catch (error) {
-      console.error('Payment error:', error);
-      toast.error(error instanceof Error ? error.message : 'Payment failed');
+      const msg = getUserFriendlyMessage(error, 'Payment failed');
+      toast.error(msg);
       setStep(1);
     }
   };
@@ -301,7 +312,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Transaction ID:</span>
             <a
-              href={getBlockExplorerUrl(BCH_NETWORK, 'tx', txid)}
+              href={getTxExplorerUrl(txid)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"

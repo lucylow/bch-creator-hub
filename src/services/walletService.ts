@@ -1,5 +1,6 @@
 import { demoWallet } from '@/demo';
 import { logger } from '@/utils/logger';
+import { normalizeError, getUserFriendlyMessage } from '@/utils/errorUtils';
 import { bchProvider } from '@/lib/web3/providers/BCHProvider';
 
 export interface WalletConnectionResult {
@@ -28,18 +29,18 @@ declare global {
     paytaca?: {
       getAccounts?: () => Promise<string[]>;
       signMessage?: (address: string, message: string, format?: string) => Promise<string>;
-      sendTransaction?: (tx: any) => Promise<string>;
-      request?: (args: { method: string; params?: any[] }) => Promise<any>;
-      on?: (event: string, handler: (data: any) => void) => void;
+      sendTransaction?: (tx: unknown) => Promise<string>;
+      request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (event: string, handler: (data: unknown) => void) => void;
       isConnected?: () => boolean;
     };
     electronCash?: {
-      requestDevice?: () => Promise<any>;
+      requestDevice?: () => Promise<{ open: () => Promise<void>; getAccounts: () => Promise<Array<{ address?: string } | string>> }>;
     };
     bitcoinCash?: {
-      request?: (args: { method: string; params?: any[] }) => Promise<any>;
+      request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
       signMessage?: (address: string, message: string, format?: string) => Promise<string>;
-      sendTransaction?: (tx: any) => Promise<string>;
+      sendTransaction?: (tx: unknown) => Promise<string>;
       getAccounts?: () => Promise<string[]>;
     };
     libauth?: {
@@ -83,11 +84,24 @@ class WalletService {
       const response = await fetch(`${base}/api/wallet/balance/${encodeURIComponent(address)}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch balance');
+        const body = await response.text();
+        let detail = response.statusText;
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          if (parsed?.error || parsed?.message) detail = String(parsed.error ?? parsed.message);
+        } catch {
+          // ignore
+        }
+        throw new Error(detail || `Failed to fetch balance (${response.status})`);
       }
       
-      const json = await response.json();
-      const bal = json?.data ?? json;
+      let json: Record<string, unknown>;
+      try {
+        json = await response.json();
+      } catch {
+        throw new Error('Invalid response from balance API');
+      }
+      const bal = (json?.data ?? json) as Record<string, unknown> | undefined;
       const confirmed = Number(bal?.confirmed ?? 0) || 0;
       const unconfirmed = Number(bal?.unconfirmed ?? 0) || 0;
       return {
@@ -96,36 +110,34 @@ class WalletService {
         total: Number(bal?.total ?? 0) || confirmed + unconfirmed
       };
     } catch (error) {
-      logger.warn('Web3 balance fetch failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), address });
-      // Fallback to mock data
+      const err = normalizeError(error);
+      logger.warn('Web3 balance fetch failed, falling back to mock data', { error: err.message, address });
       return demoWallet.getBalance(address);
     }
   }
 
   async connectWallet(walletType: string = 'generic'): Promise<WalletConnectionResult> {
-    // Try web3 first
-    try {
-      // Check if wallet is available
-      if (typeof window === 'undefined') {
-        throw new Error('Wallet connection not available in this environment');
-      }
+    if (typeof window === 'undefined') {
+      return { success: false, error: 'Wallet connection is not available in this environment.' };
+    }
 
-      // Use BCH provider for connection
+    // Demo wallet: skip provider and use mock adapter
+    if (walletType === 'demo') {
+      return demoWallet.connect();
+    }
+
+    try {
       try {
         const walletData = await bchProvider.connectWallet(walletType);
-        
+
         if (walletData && walletData.address) {
-          // Generate authentication message
           const message = this.generateAuthMessage(walletData.address);
-          
-          // Sign message for authentication
-          let signature: string;
           const wallets = await bchProvider.checkWalletInjection();
           const wallet = wallets[walletType];
-          
+
+          let signature: string;
           if (wallet && wallet.supportsBIP322) {
             try {
-              // Try BIP-322 signing
               signature = await this.signMessageBIP322(walletData.address, message, wallet.instance);
             } catch (bipError) {
               logger.warn('BIP-322 signing failed, falling back to legacy', bipError);
@@ -134,111 +146,101 @@ class WalletService {
           } else {
             signature = await this.signMessageLegacy(walletData.address, message, wallet?.instance);
           }
-          
-          return {
-            success: true,
-            address: walletData.address,
-            signature,
-            message
-          };
+
+          return { success: true, address: walletData.address, signature, message };
         }
-        
-        throw new Error('Failed to get address from wallet');
+        return { success: false, error: 'Wallet did not return an address.' };
       } catch (providerError) {
-        // Fallback to direct wallet connection
         return await this.connectWalletDirect(walletType);
       }
     } catch (error) {
-      logger.warn('Web3 wallet connection failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), walletType });
-      // Fallback to mock data
-      return demoWallet.connect();
+      const err = normalizeError(error);
+      const msg = getUserFriendlyMessage(err, 'Wallet connection failed');
+      logger.warn('Wallet connection failed', { error: err.message, walletType });
+      return { success: false, error: msg };
     }
   }
 
   private async connectWalletDirect(walletType: string): Promise<WalletConnectionResult> {
-    const win = window as any;
+    const win = window;
     let address: string;
-    
-    try {
-      switch (walletType) {
-        case 'paytaca':
-          if (!win.paytaca) {
-            throw new Error('Paytaca wallet not detected. Please install the Paytaca browser extension.');
-          }
-          
-          // Paytaca connection
-          if (win.paytaca.getAccounts) {
-            const accounts = await win.paytaca.getAccounts();
-            address = Array.isArray(accounts) ? accounts[0] : accounts;
-          } else if (win.paytaca.request) {
-            const accounts = await win.paytaca.request({ method: 'bch_requestAccounts' });
-            address = Array.isArray(accounts) ? accounts[0] : accounts;
-          } else {
-            throw new Error('Paytaca wallet does not support connection');
-          }
-          break;
-          
-        case 'electron-cash':
-          if (!win.electronCash) {
-            throw new Error('Electron Cash not detected');
-          }
-          
-          const device = await win.electronCash.requestDevice();
-          await device.open();
-          const ecAccounts = await device.getAccounts();
-          address = ecAccounts[0]?.address || ecAccounts[0];
-          break;
-          
-        case 'generic':
-        default:
-          if (win.bitcoinCash) {
-            if (win.bitcoinCash.request) {
-              const accounts = await win.bitcoinCash.request({ method: 'bch_requestAccounts' });
-              address = Array.isArray(accounts) ? accounts[0] : accounts;
-            } else if (win.bitcoinCash.getAccounts) {
-              const accounts = await win.bitcoinCash.getAccounts();
-              address = Array.isArray(accounts) ? accounts[0] : accounts;
-            } else {
-              throw new Error('Generic wallet does not support connection');
-            }
-          } else {
-            throw new Error('No Bitcoin Cash wallet detected. Please install a compatible wallet extension.');
-          }
-          break;
-      }
-      
-      if (!address) {
-        throw new Error('No address returned from wallet');
-      }
-      
-      // Generate and sign message
-      const message = this.generateAuthMessage(address);
-      let signature: string;
-      
-      const wallet = win.paytaca || win.bitcoinCash || win.electronCash;
-      if (walletType === 'paytaca' || walletType === 'generic') {
-        try {
-          signature = await this.signMessageBIP322(address, message, wallet);
-        } catch {
-          signature = await this.signMessageLegacy(address, message, wallet);
+
+    switch (walletType) {
+      case 'paytaca':
+        if (!win.paytaca) {
+          throw new Error('Paytaca wallet not detected. Please install the Paytaca browser extension.');
         }
-      } else {
+
+        // Paytaca connection
+        if (win.paytaca.getAccounts) {
+          const accounts = await win.paytaca.getAccounts();
+          address = Array.isArray(accounts) ? accounts[0] : accounts;
+        } else if (win.paytaca.request) {
+          const accounts = await win.paytaca.request({ method: 'bch_requestAccounts' });
+          address = Array.isArray(accounts) ? accounts[0] : accounts;
+        } else {
+          throw new Error('Paytaca wallet does not support connection');
+        }
+        break;
+
+      case 'electron-cash': {
+        if (!win.electronCash) {
+          throw new Error('Electron Cash not detected');
+        }
+
+        const device = await win.electronCash.requestDevice();
+        await device.open();
+        const ecAccounts = await device.getAccounts();
+        address = ecAccounts[0]?.address || ecAccounts[0];
+        break;
+      }
+
+      case 'generic':
+      default:
+        if (win.bitcoinCash) {
+          if (win.bitcoinCash.request) {
+            const accounts = await win.bitcoinCash.request({ method: 'bch_requestAccounts' });
+            address = Array.isArray(accounts) ? accounts[0] : accounts;
+          } else if (win.bitcoinCash.getAccounts) {
+            const accounts = await win.bitcoinCash.getAccounts();
+            address = Array.isArray(accounts) ? accounts[0] : accounts;
+          } else {
+            throw new Error('This wallet does not support connection. Try Paytaca or Demo Wallet.');
+          }
+        } else {
+          throw new Error('No Bitcoin Cash wallet detected. Use Demo Wallet to explore, or install Paytaca from paytaca.com and refresh.');
+        }
+        break;
+    }
+
+    if (!address) {
+      throw new Error('No address returned from wallet');
+    }
+
+    // Generate and sign message
+    const message = this.generateAuthMessage(address);
+    let signature: string;
+
+    const wallet = win.paytaca || win.bitcoinCash || win.electronCash;
+    if (walletType === 'paytaca' || walletType === 'generic') {
+      try {
+        signature = await this.signMessageBIP322(address, message, wallet);
+      } catch {
         signature = await this.signMessageLegacy(address, message, wallet);
       }
-      
-      return {
-        success: true,
-        address,
-        signature,
-        message
-      };
-      
-    } catch (error) {
-      throw error;
+    } else {
+      signature = await this.signMessageLegacy(address, message, wallet);
     }
+
+    return {
+      success: true,
+      address,
+      signature,
+      message
+    };
   }
 
-  private async signMessageBIP322(address: string, message: string, wallet: any): Promise<string> {
+  private async signMessageBIP322(address: string, message: string, wallet: Window['paytaca'] | Window['bitcoinCash']): Promise<string> {
     try {
       // Try BIP-322 signing (preferred method)
       if (wallet.signMessage && wallet.signMessage.length === 3) {
@@ -259,7 +261,7 @@ class WalletService {
     }
   }
 
-  private async signMessageLegacy(address: string, message: string, wallet: any): Promise<string> {
+  private async signMessageLegacy(address: string, message: string, wallet: Window['paytaca'] | Window['bitcoinCash'] | Window['electronCash']): Promise<string> {
     try {
       // Legacy signing methods
       if (wallet.signMessage) {
@@ -331,18 +333,30 @@ class WalletService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Payment failed');
+        const text = await response.text();
+        let msg = 'Payment failed';
+        try {
+          const errorData = text ? JSON.parse(text) : {};
+          if (errorData?.error || errorData?.message) msg = String(errorData.error ?? errorData.message);
+        } catch {
+          if (text) msg = `${response.status}: ${response.statusText}`;
+        }
+        throw new Error(msg);
       }
 
-      const data = await response.json();
+      let data: { txid?: string };
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Invalid response from payment API');
+      }
       return {
         success: true,
         txid: data.txid
       };
     } catch (error) {
-      logger.warn('Web3 payment failed, falling back to mock data', { error: error instanceof Error ? error.message : String(error), toAddress, amountSats });
-      // Fallback to mock data
+      const err = normalizeError(error);
+      logger.warn('Web3 payment failed, falling back to mock data', { error: err.message, toAddress, amountSats });
       return demoWallet.sendPayment(toAddress, amountSats, payload);
     }
   }
@@ -351,7 +365,7 @@ class WalletService {
     const wallets: string[] = [];
     
     if (typeof window !== 'undefined') {
-      const win = window as any;
+      const win = window;
       
       // Check for Paytaca wallet (most common BCH wallet)
       if (win.paytaca) {
@@ -386,7 +400,7 @@ class WalletService {
   }
 
   getWalletInfo(walletId: string): WalletInfo {
-    const win = typeof window !== 'undefined' ? window as any : null;
+    const win = typeof window !== 'undefined' ? window : null;
     
     const walletInfoMap: Record<string, WalletInfo> = {
       'paytaca': {

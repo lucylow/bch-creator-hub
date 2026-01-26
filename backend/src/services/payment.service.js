@@ -1,5 +1,6 @@
 const Transaction = require('../models/Transaction');
 const PaymentIntent = require('../models/PaymentIntent');
+const Creator = require('../models/Creator');
 const BCHService = require('./bch.service');
 const MicropaymentService = require('./micropayment.service');
 const NotificationService = require('./notification.service');
@@ -483,15 +484,80 @@ class PaymentService {
     try {
       const stats = await Transaction.getStats(creatorId, startDate, endDate);
       const micropaymentStats = await MicropaymentService.getMicropaymentStats(creatorId, startDate, endDate);
+      const stripeStats = await Transaction.getStripeStats(creatorId, startDate, endDate);
       
       return {
         ...stats,
-        micropayments: micropaymentStats
+        micropayments: micropaymentStats,
+        stripe_total_cents: stripeStats?.total_cents ?? 0,
+        stripe_transaction_count: stripeStats?.transaction_count ?? 0
       };
     } catch (error) {
       logger.error(`Error getting payment stats for creator ${creatorId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Record a Stripe payment (called from Stripe webhook).
+   * Stores in transactions with txid = stripe_<sessionId>, amount_sats = 0,
+   * metadata.source = 'stripe', metadata.amount_cents, metadata.currency.
+   */
+  async recordStripePayment({
+    sessionId,
+    paymentIntentId,
+    creatorId,
+    amountCents,
+    currency = 'usd',
+    customerEmail,
+    metadata = {}
+  }) {
+    const txid = `stripe_${sessionId}`;
+    const existing = await Transaction.findByTxid(txid);
+    if (existing) {
+      logger.info(`Stripe payment already recorded: ${txid}`);
+      return existing;
+    }
+
+    const creator = await Creator.findByCreatorId(creatorId);
+    if (!creator) {
+      throw new AppError(`Creator not found: ${creatorId}`, 404);
+    }
+    const receiverAddress = creator.contract_address || creator.wallet_address || 'stripe-receiver';
+    const senderAddress = (customerEmail && String(customerEmail).length <= 64)
+      ? String(customerEmail)
+      : 'stripe';
+
+    const transaction = await Transaction.create({
+      txid,
+      creatorId,
+      paymentIntentId: null,
+      intentId: paymentIntentId || null,
+      amountSats: 0,
+      feeSats: 0,
+      senderAddress,
+      receiverAddress,
+      paymentType: 1,
+      contentId: null,
+      payloadHex: null,
+      payloadJson: {},
+      blockHeight: null,
+      confirmations: 0,
+      isConfirmed: true,
+      confirmedAt: new Date(),
+      metadata: {
+        source: 'stripe',
+        amount_cents: amountCents,
+        currency,
+        stripe_session_id: sessionId,
+        stripe_payment_intent_id: paymentIntentId || undefined,
+        ...metadata
+      }
+    });
+
+    await balanceCache.invalidateBalance(creatorId);
+    logger.info(`Stripe payment recorded: ${txid} creator=${creatorId} amount=${amountCents} ${currency}`);
+    return transaction;
   }
 
   /**

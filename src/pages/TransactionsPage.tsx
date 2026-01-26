@@ -33,7 +33,7 @@ const TransactionsPage = () => {
   });
 
   // Filter transactions
-  const filteredTransactions = data?.transactions?.filter((tx: any) => {
+  const filteredTransactions = data?.transactions?.filter((tx: { txid?: string; senderAddress?: string; recipientAddress?: string; type?: number; paymentType?: string; status?: string }) => {
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -59,7 +59,7 @@ const TransactionsPage = () => {
     return true;
   }) || [];
 
-  const totalAmount = filteredTransactions.reduce((sum: number, tx: any) => {
+  const totalAmount = filteredTransactions.reduce((sum: number, tx: { amountSats?: number }) => {
     return sum + (tx.amountSats || 0);
   }, 0);
 

@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Home, BarChart2, Link2, Settings, LogOut, Route, Wallet, Image, ChevronRight, ArrowUpDown, ArrowUpRight, Users, HelpCircle } from 'lucide-react';
+import { Menu, X, Home, BarChart2, Link2, Settings, LogOut, Route, Wallet, Image, ChevronRight, ArrowUpDown, ArrowUpRight, Users, HelpCircle, Vote } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 import { useCreator } from '@/contexts/CreatorContext';
 import WalletConnectButton from '@/components/Wallet/WalletConnectButton';
 import { truncateAddress } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { NavLink } from '@/components/NavLink';
+import { ThemeToggle } from '@/components/Common/ThemeToggle';
 import { cn } from '@/lib/utils';
 
 const navLinks = [
   { path: '/dashboard', label: 'Dashboard', icon: Home, exact: true },
   { path: '/links', label: 'Payment Links', icon: Link2, exact: false },
   { path: '/nfts', label: 'NFTs', icon: Image, exact: true },
+  { path: '/dao', label: 'Governance', icon: Vote, exact: false },
   { path: '/transactions', label: 'Transactions', icon: ArrowUpDown, exact: true },
   { path: '/withdrawals', label: 'Withdrawals', icon: ArrowUpRight, exact: true },
   { path: '/supporters', label: 'Supporters', icon: Users, exact: true },
@@ -174,6 +176,9 @@ const AppNavigation = () => {
               className="fixed inset-x-0 top-16 bottom-0 z-40 bg-background border-b border-border overflow-y-auto md:hidden"
             >
               <div className="p-6 space-y-4">
+                <div className="flex justify-end -mt-1">
+                  <ThemeToggle variant="outline" size="sm" />
+                </div>
                 {isConnected ? (
                   <>
                     <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border border-border/50">
@@ -201,7 +206,7 @@ const AppNavigation = () => {
                               end={link.exact}
                               onClick={() => setIsOpen(false)}
                               className={cn(
-                                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all',
+                                'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all min-h-[48px]',
                                 'text-muted-foreground hover:bg-muted',
                                 isActive && 'bg-primary/10 text-primary font-medium'
                               )}
@@ -240,7 +245,7 @@ const AppNavigation = () => {
                             end={link.exact}
                             onClick={() => setIsOpen(false)}
                             className={cn(
-                              'flex items-center gap-3 px-4 py-3 rounded-lg transition-all',
+                              'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all min-h-[48px]',
                               'text-muted-foreground hover:bg-muted',
                               isActive && 'bg-primary/10 text-primary font-medium'
                             )}

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
+import { normalizeError } from '@/utils/errorUtils';
 
 export interface UsePollingOptions {
   /** Polling interval in ms */
@@ -37,7 +39,12 @@ export default function usePolling(
       try {
         await fn();
       } catch (e) {
-        onErrorRef.current?.(e);
+        const err = normalizeError(e);
+        if (onErrorRef.current) {
+          onErrorRef.current(e);
+        } else {
+          logger.warn('Polling callback threw', { error: err.message });
+        }
       }
       if (!cancelled) {
         timerRef.current = window.setTimeout(tick, interval);

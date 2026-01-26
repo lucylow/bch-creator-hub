@@ -17,7 +17,8 @@ src/
 │       │   └── BCHProvider.ts     # Core BCH provider for wallet management
 │       ├── hooks/
 │       │   ├── usePayments.ts     # Hook for payment operations
-│       │   └── useContracts.ts    # Hook for contract operations
+│       │   ├── useContracts.ts    # Hook for contract operations
+│       │   └── useBCHNetwork.ts   # Hook for network and block explorer URLs
 │       ├── utils/
 │       │   └── bch.ts             # BCH utility functions (formatting, validation)
 │       └── index.ts               # Main export file
@@ -32,12 +33,14 @@ src/
 ### 1. Wallet Management (BCHProvider)
 
 The `BCHProvider` class provides:
-- Multi-wallet support (Paytaca, Electron Cash, generic BCH wallets, WalletConnect)
+- Multi-wallet support (Paytaca, Electron Cash, generic BCH wallets, WalletConnect, Libauth)
+- Wallet key resolution so `electron-cash` (from walletService) maps to internal `electronCash`
 - Wallet detection and injection
 - BIP-322 message signing for authentication
 - Real-time balance updates
 - UTXO management
 - Transaction sending
+- Network-aware block explorer URLs (`getBlockExplorerTxUrl`, `getBlockExplorerAddressUrl`)
 - Event-based architecture for state management
 
 **Location:** `src/lib/web3/providers/BCHProvider.ts`
@@ -68,9 +71,21 @@ The WebSocket client provides:
 - `sendTip()` - Send tips to creators
 - `unlockContent()` - Unlock content with payment
 - `purchaseSubscription()` - Purchase subscriptions
-- `estimateFee()` - Estimate transaction fees
+- `estimateFee()` - Local fee estimate
+- `estimateFeeFromServer()` - Server-side fee estimate when API is available
+- `lastTxId` - Transaction ID of the last successful payment (for “View on Explorer”)
+- `getTxExplorerUrl(txid)` - Network-aware block explorer URL for a transaction
+- `clearLastTxId()` - Clear the last transaction ID
 
 **Location:** `src/lib/web3/hooks/usePayments.ts`
+
+#### useBCHNetwork
+- `network` - Current BCH network (`mainnet` | `testnet` | `regtest`)
+- `isTestnet` / `isMainnet` - Convenience booleans
+- `getTxExplorerUrl(txid)` - Block explorer URL for a transaction
+- `getAddressExplorerUrl(address)` - Block explorer URL for an address
+
+**Location:** `src/lib/web3/hooks/useBCHNetwork.ts`
 
 #### useContracts
 - `deployContract()` - Deploy smart contracts
