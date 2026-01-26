@@ -46,7 +46,7 @@ export default function CreateVoucher() {
     query: { enabled: !!address && !!MARKETPLACE_ADDRESS },
   });
 
-  const { mutateAsync: signTypedDataAsync, isPending, error, reset } = useSignTypedData();
+  const { signTypedDataAsync, isPending, error, reset } = useSignTypedData();
 
   const handleSign = async () => {
     if (!isConnected || !address) {
@@ -83,7 +83,7 @@ export default function CreateVoucher() {
         types,
         primaryType: 'NFTVoucher',
         message,
-      });
+      } as unknown as Parameters<typeof signTypedDataAsync>[0]);
       const payload = JSON.stringify(
         {
           seller: address,

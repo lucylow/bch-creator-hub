@@ -129,7 +129,7 @@ export class SocketIOClient {
     });
 
     this.socket.on('error', (data: { message?: string; code?: string }) => {
-      logger.error('Socket.io server error', data);
+      logger.error('Socket.io server error', new Error(data?.message ?? 'Unknown error'));
       this.emit('error', { message: data?.message ?? 'Unknown error', code: data?.code });
     });
 

@@ -74,6 +74,19 @@ export default function BuyNFT() {
     },
   });
 
+  const fillFromJson = (text: string) => {
+    try {
+      const data = JSON.parse(text);
+      if (data.seller) setSeller(data.seller);
+      if (data.uri) setTokenURI(data.uri);
+      if (data.price) setPrice(data.price);
+      if (data.nonce !== undefined) setNonce(String(data.nonce));
+      if (data.signature) setSignature(data.signature);
+    } catch {
+      // Invalid JSON, ignore
+    }
+  };
+
   const handleRedeem = async () => {
     if (!isConnected || !address) {
       toast.error('Please connect your wallet');
@@ -104,7 +117,7 @@ export default function BuyNFT() {
         functionName: 'redeem',
         args: [voucher, signature as `0x${string}`],
         value: parseEther(price),
-      });
+      } as unknown as Parameters<typeof writeContract>[0]);
     } catch (err) {
       const msg = getUserFriendlyMessage(err, 'Failed to redeem voucher');
       logger.error('Redeem error', err instanceof Error ? err : new Error(String(err)), { seller, tokenURI: tokenURI?.slice(0, 50) });

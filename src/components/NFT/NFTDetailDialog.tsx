@@ -157,7 +157,7 @@ export default function NFTDetailDialog({
       abi: NFT_ABI,
       functionName: 'transferFrom',
       args: [owner as `0x${string}`, to, BigInt(tokenId)],
-    });
+    } as unknown as Parameters<typeof writeTransfer>[0]);
   };
 
   const imageUrl = meta?.image?.startsWith('ipfs://')

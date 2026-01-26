@@ -35,17 +35,27 @@ const WithdrawalsPage = () => {
     retry: 1,
   });
 
-  const withdrawals = data?.withdrawals || [];
+  type WithdrawalItem = { 
+    id: string; 
+    amountSats?: number; 
+    feeSats?: number; 
+    toAddress?: string;
+    status: string; 
+    createdAt: string;
+    txid?: string;
+  };
+
+  const withdrawals = (data?.withdrawals || []) as WithdrawalItem[];
   const filteredWithdrawals = filterStatus === 'all' 
     ? withdrawals 
-    : withdrawals.filter((w: { status: string }) => w.status === filterStatus);
+    : withdrawals.filter((w) => w.status === filterStatus);
 
   const totalWithdrawn = withdrawals
-    .filter((w: { status: string }) => w.status === 'confirmed')
-    .reduce((sum: number, w: { amountSats?: number }) => sum + (w.amountSats || 0), 0);
+    .filter((w) => w.status === 'confirmed')
+    .reduce((sum: number, w) => sum + (w.amountSats || 0), 0);
 
-  const pendingWithdrawals = withdrawals.filter((w: { status: string }) => w.status === 'pending');
-  const pendingAmount = pendingWithdrawals.reduce((sum: number, w: { amountSats?: number }) => sum + (w.amountSats || 0), 0);
+  const pendingWithdrawals = withdrawals.filter((w) => w.status === 'pending');
+  const pendingAmount = pendingWithdrawals.reduce((sum: number, w) => sum + (w.amountSats || 0), 0);
 
   const getStatusType = (status: string): 'success' | 'pending' | 'failed' => {
     switch (status) {
@@ -244,7 +254,7 @@ const WithdrawalsPage = () => {
           ) : (
             <div className="divide-y divide-border/50">
               <AnimatePresence mode="popLayout">
-                {filteredWithdrawals.map((withdrawal: { id: string; amountSats?: number; status: string; createdAt: string; txid?: string }, index: number) => (
+                {filteredWithdrawals.map((withdrawal, index: number) => (
                   <motion.div
                     key={withdrawal.id}
                     initial={{ opacity: 0, x: -10 }}
@@ -281,9 +291,9 @@ const WithdrawalsPage = () => {
                           <span className="text-muted-foreground/50">•</span>
                           <span>{formatDate(withdrawal.createdAt)}</span>
                         </div>
-                        {withdrawal.feeSats > 0 && (
+                        {(withdrawal.feeSats ?? 0) > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Network fee: {formatBCH(withdrawal.feeSats)}
+                            Network fee: {formatBCH(withdrawal.feeSats ?? 0)}
                           </p>
                         )}
                       </div>

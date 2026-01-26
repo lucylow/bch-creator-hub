@@ -65,7 +65,7 @@ export default function MintForm() {
         abi: NFT_ABI,
         functionName: 'mint',
         args: [address, tokenURI],
-      });
+      } as unknown as Parameters<typeof writeContract>[0]);
     } catch (err) {
       const msg = getUserFriendlyMessage(err, 'Failed to mint NFT');
       logger.error('Mint error', err instanceof Error ? err : new Error(String(err)), { tokenURI: tokenURI.slice(0, 50) });

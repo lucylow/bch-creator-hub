@@ -75,7 +75,7 @@ const PaymentForm: React.FC<Props> = ({
     try {
       const id = toast.loading('Sending payment…');
       const result = await onPayment();
-      if (result?.txid) {
+      if (result && 'txid' in result && result.txid) {
         toast.success('Payment sent', { id });
       } else {
         toast.error('Payment may not have completed', { id });
