@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
-import { Rocket, PlayCircle, ArrowDown, Sparkles } from 'lucide-react';
+import { Rocket, PlayCircle, ArrowDown, Sparkles, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const HeroSection = () => {
   const scrollToSection = (href: string) => {
@@ -139,12 +140,14 @@ const HeroSection = () => {
             className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
           >
             <Button
-              onClick={() => scrollToSection('#waitlist')}
+              asChild
               size="lg"
               className="bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold px-8 py-6 text-lg glow-effect shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              <Rocket className="w-5 h-5 mr-2" />
-              Start for Free
+              <Link to="/dashboard">
+                <Wallet className="w-5 h-5 mr-2" />
+                Connect Wallet
+              </Link>
             </Button>
 
             <Button
